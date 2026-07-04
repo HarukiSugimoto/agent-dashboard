@@ -7,7 +7,9 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-const PORT = 4820;
+const PORT = process.env.PORT ? Number(process.env.PORT) : 4820;
+// デフォルトはループバックのみ。Tailscale/LAN 経由で直接受けるなら BIND=0.0.0.0
+const BIND = process.env.BIND || '127.0.0.1';
 const MAX_EVENTS = 500;
 
 const sessions = new Map(); // session_id -> session state
@@ -72,13 +74,14 @@ function classifyClaude(h) {
   return { activity: 'thinking', label: ev, detail: '' };
 }
 
-function ingest(source, sessionId, cwd, classified) {
+function ingest(source, sessionId, cwd, classified, host) {
   const now = Date.now();
   const event = {
     ts: now,
     source,
     session_id: sessionId,
     cwd: cwd || '',
+    host: host || '',
     ...classified,
   };
   events.push(event);
@@ -91,6 +94,7 @@ function ingest(source, sessionId, cwd, classified) {
     source,
     project,
     cwd: cwd || '',
+    host: host || '',
     activity: event.activity,
     label: event.label,
     detail: event.detail,
@@ -123,7 +127,7 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'POST' && url.pathname === '/ingest/claude') {
     try {
       const h = JSON.parse(await readBody(req));
-      ingest('claude', h.session_id || 'unknown', h.cwd, classifyClaude(h));
+      ingest('claude', h.session_id || 'unknown', h.cwd, classifyClaude(h), req.headers['x-agent-host']);
       res.writeHead(200).end('ok');
     } catch (e) {
       res.writeHead(400).end('bad json');
@@ -140,7 +144,7 @@ const server = http.createServer(async (req, res) => {
         label: h.label || h.activity || '',
         detail: h.detail || '',
         tool: h.tool || '',
-      });
+      }, h.host || req.headers['x-agent-host']);
       res.writeHead(200).end('ok');
     } catch (e) {
       res.writeHead(400).end('bad json');
@@ -185,6 +189,6 @@ setInterval(() => {
   for (const res of clients) res.write(': ping\n\n');
 }, 15000);
 
-server.listen(PORT, '127.0.0.1', () => {
-  console.log(`agent-dashboard collector: http://localhost:${PORT}`);
+server.listen(PORT, BIND, () => {
+  console.log(`agent-dashboard collector: http://${BIND}:${PORT}`);
 });

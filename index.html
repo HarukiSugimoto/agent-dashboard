@@ -243,7 +243,8 @@ function renderSession(s) {
   el.querySelector('.badge').textContent = s.source.toUpperCase();
   el.querySelector('.badge').className = 'badge ' + s.source;
   el.querySelector('.proj').textContent = s.project;
-  el.querySelector('.sid').textContent = s.session_id.slice(0, 8);
+  el.querySelector('.sid').textContent =
+    (s.host ? s.host + ' · ' : '') + s.session_id.slice(0, 8);
   el.querySelector('.label').textContent = s.label;
   el.querySelector('.detail').textContent = s.detail || '';
   el.querySelector('.count').textContent = s.event_count + ' events';
@@ -256,7 +257,7 @@ function renderEvent(e) {
   const row = document.createElement('div');
   row.className = 'row';
   row.style.setProperty('--c', COLORS[e.activity] || 'var(--dim)');
-  const proj = e.cwd ? e.cwd.split('/').pop() : '';
+  const proj = (e.host ? e.host + ':' : '') + (e.cwd ? e.cwd.split('/').pop() : '');
   row.innerHTML = `
     <span class="t">${fmtTime(e.ts)}</span>
     <span class="m"></span>

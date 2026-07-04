@@ -20,6 +20,8 @@
   <string>13.0</string>
   <key>NSHighResolutionCapable</key>
   <true/>
+  <key>CFBundleIconFile</key>
+  <string>AppIcon</string>
   <key>NSAppTransportSecurity</key>
   <dict>
     <!-- http://127.0.0.1 のローカルコレクタへの接続を許可 -->

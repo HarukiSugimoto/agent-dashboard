@@ -7,12 +7,13 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Zen+Maru+Gothic:wght@500;700&family=IBM+Plex+Mono:wght@400;600&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap" rel="stylesheet">
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js"}}</script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   button { font: inherit; cursor: pointer; }
 
   /* ================= テーマ変数 ================= */
-  body[data-theme="clay"] {
+  body[data-theme="clay"], body[data-theme="office"] {
     --bg: #f6efe3;
     --text: #5b4a3a;
     --dim: #a08d78;
@@ -79,7 +80,7 @@
   /* ================= ヘッダー ================= */
   header { position: relative; z-index: 2; display: flex; align-items: center; gap: 1rem; padding: 1.2rem 1.8rem .9rem; }
   h1 { font-size: 1.25rem; font-weight: 800; letter-spacing: .06em; }
-  body[data-theme="clay"] h1 { font-family: "Baloo 2", "Zen Maru Gothic", sans-serif; color: #6b5642; text-shadow: 0 2px 0 #fff; }
+  body[data-theme="clay"] h1, body[data-theme="office"] h1 { font-family: "Baloo 2", "Zen Maru Gothic", sans-serif; color: #6b5642; text-shadow: 0 2px 0 #fff; }
   body[data-theme="ops"] h1 { font-family: "IBM Plex Mono", monospace; font-size: 1rem; letter-spacing: .35em; color: var(--c-coding); text-shadow: 0 0 12px rgba(61,214,140,.45); }
   header .right { margin-left: auto; display: flex; gap: .7rem; align-items: center; }
   #clock { font-family: "IBM Plex Mono", monospace; font-size: .9rem; color: var(--dim); }
@@ -88,7 +89,7 @@
   @keyframes blink { 50% { opacity: .2; } }
 
   .hbtn { border: none; font-weight: 700; font-size: .74rem; padding: .45rem .9rem; border-radius: 999px; color: var(--dim); background: var(--card-hi); transition: transform .15s, color .2s; }
-  body[data-theme="clay"] .hbtn { box-shadow: 3px 3px 8px var(--sh-dark), -3px -3px 8px var(--sh-light); }
+  body[data-theme="clay"] .hbtn, body[data-theme="office"] .hbtn { box-shadow: 3px 3px 8px var(--sh-dark), -3px -3px 8px var(--sh-light); }
   body[data-theme="ops"]  .hbtn { background: none; border: 1px solid #38434d; border-radius: 4px; font-family: "IBM Plex Mono", monospace; letter-spacing: .1em; }
   .hbtn:hover { color: var(--c-waiting); transform: translateY(-1px); }
   .hbtn:active { transform: scale(.94); }
@@ -115,7 +116,22 @@
       inset 2px 2px 6px rgba(255,255,255,.85),
       inset -3px -3px 8px rgba(185,160,125,.18);
   }
-  body[data-theme="ops"] .card { border-radius: 8px; border: 1px solid #1c242c; border-left: 3px solid var(--c); }
+  /* 管制室: 1セッション=2行の高密度リスト（小さいウィンドウで数を見る用）
+     1行目: プロジェクト｜状態｜n分前   2行目: 詳細｜host·ID */
+  body[data-theme="ops"] .card { border-radius: 4px; border: 1px solid #1c242c; border-left: 3px solid var(--c); padding: .35rem .6rem; }
+  body[data-theme="ops"] .avatar { display: none; }
+  body[data-theme="ops"] #grid { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: .35rem; padding: .6rem 1rem; }
+  body[data-theme="ops"] .info { display: grid; grid-template-columns: auto 1fr auto; column-gap: .55rem; row-gap: .12rem; align-items: baseline; }
+  body[data-theme="ops"] .proj { grid-area: 1 / 1; font-size: .76rem; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 11em; }
+  body[data-theme="ops"] .label { grid-area: 1 / 2; font-size: .7rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  body[data-theme="ops"] .meta { display: contents; }
+  body[data-theme="ops"] .meta .elapsed { grid-area: 1 / 3; font-family: "IBM Plex Mono", monospace; font-size: .58rem; color: var(--dim); }
+  body[data-theme="ops"] .detail { grid-area: 2 / 1 / 2 / 3; font-size: .6rem; margin: 0; min-height: 0; }
+  body[data-theme="ops"] .meta .sid { grid-area: 2 / 3; font-family: "IBM Plex Mono", monospace; font-size: .56rem; color: var(--faint); }
+  body[data-theme="ops"] .card:hover { transform: none; }
+  body[data-theme="ops"] .x { top: 50%; transform: translateY(-50%); width: 20px; height: 20px; font-size: .65rem; }
+  body[data-theme="ops"] header { padding: .6rem 1rem .5rem; }
+  body[data-theme="ops"] header h1 { font-size: .8rem; }
   body[data-theme="ops"] .card.active { box-shadow: -6px 0 24px -12px var(--c); }
   .card:hover { transform: translateY(-5px) rotate(-.4deg); }
   .card.gone { opacity: .4; }
@@ -123,22 +139,64 @@
   @keyframes appear { from { opacity: 0; transform: scale(.8) translateY(16px); } }
   @keyframes pop { 50% { transform: scale(1.035); } }
 
-  /* --- ぷにぷにアバター --- */
+  /* --- キャラクターアバター ---
+     assets/avatars/<activity>.png があればキャラ画像（行動シーン）を表示、
+     なければ絵文字にフォールバック。キャラは浮遊し、足元に影が落ちる。 */
   .avatar {
-    width: 74px; height: 74px; flex-shrink: 0;
-    border-radius: 50%;
+    width: 108px; height: 108px; flex-shrink: 0;
+    position: relative;
     display: grid; place-items: center;
-    font-size: 2.1rem;
-    background: radial-gradient(circle at 32% 28%, #ffffff 0%, var(--c) 78%);
+    border-radius: 28px;
+    background: radial-gradient(circle at 32% 24%, #ffffff 0%, color-mix(in srgb, var(--c) 55%, #fff) 85%);
+    overflow: visible;
   }
   body[data-theme="clay"] .avatar {
     box-shadow:
       5px 6px 12px var(--sh-dark),
       inset 3px 4px 6px rgba(255,255,255,.75),
-      inset -4px -5px 10px rgba(0,0,0,.14);
+      inset -4px -5px 10px rgba(0,0,0,.12);
   }
-  body[data-theme="ops"] .avatar { background: radial-gradient(circle at 32% 28%, #202a33 0%, #0c1014 80%); border: 2px solid var(--c); box-shadow: 0 0 14px -4px var(--c); font-size: 1.9rem; }
-  .card.active .avatar { animation: boing 1.7s ease-in-out infinite; }
+  body[data-theme="ops"] .avatar {
+    border-radius: 10px;
+    background: radial-gradient(circle at 32% 28%, #202a33 0%, #0c1014 80%);
+    border: 2px solid var(--c); box-shadow: 0 0 14px -4px var(--c);
+  }
+  .avatar .pose {
+    position: absolute; bottom: 6px;
+    width: 112%; max-width: none;
+    object-fit: contain;
+    filter: drop-shadow(0 3px 4px rgba(90, 60, 30, .18));
+    display: none;
+    z-index: 2;
+  }
+  .avatar .ground {
+    position: absolute; bottom: 4px; left: 50%;
+    width: 62%; height: 12px;
+    transform: translateX(-50%);
+    border-radius: 50%;
+    background: rgba(90, 60, 30, .22);
+    filter: blur(3px);
+    display: none;
+    z-index: 1;
+  }
+  body[data-theme="ops"] .avatar .ground { background: rgba(0, 0, 0, .55); }
+  .avatar .emoji { font-size: 2.6rem; }
+  /* 画像があるとき: キャラ表示・絵文字非表示 */
+  .avatar.img .pose, .avatar.img .ground { display: block; }
+  .avatar.img .emoji { display: none; }
+
+  /* 活動中: 画像キャラはふわふわ浮遊（影が連動）、絵文字はぷにぷに */
+  .card.active .avatar .pose { animation: hover-float 2.4s ease-in-out infinite; }
+  .card.active .avatar .ground { animation: hover-shadow 2.4s ease-in-out infinite; }
+  .card.active .avatar:not(.img) { animation: boing 1.7s ease-in-out infinite; }
+  @keyframes hover-float {
+    0%, 100% { transform: translateY(0) rotate(-1deg); }
+    50%      { transform: translateY(-9px) rotate(1.2deg); }
+  }
+  @keyframes hover-shadow {
+    0%, 100% { transform: translateX(-50%) scaleX(1); opacity: 1; }
+    50%      { transform: translateX(-50%) scaleX(.72); opacity: .55; }
+  }
   @keyframes boing {
     0%, 100% { transform: translateY(0) scale(1, 1); }
     30%      { transform: translateY(-7px) scale(.96, 1.06); }
@@ -165,6 +223,83 @@
   .card:hover .x { opacity: 1; }
   .x:hover { color: var(--c-waiting); transform: scale(1.15); }
   .x:active { transform: scale(.9); }
+
+  /* ================= 3D バーチャルオフィス ================= */
+  /* ミッドナイトロフト: オフィステーマ時はページ全体を夜に */
+  body[data-theme="office"] {
+    --bg: #1c2238; --text: #e6e2d6; --dim: #8a93b8;
+    --card-hi: #1c2340; --card-lo: #151a30;
+    --sh-dark: rgba(0, 0, 0, .55); --sh-light: rgba(255, 255, 255, .05);
+  }
+  body[data-theme="office"] #blobs { display: none; }
+  body[data-theme="office"] h1 { color: #f4e8cf; text-shadow: 0 0 16px rgba(255, 196, 130, .4); }
+  #office { display: none; }
+  body[data-theme="office"] #grid { display: none; }
+  body[data-theme="office"] #office { display: block; }
+  /* 部屋は画面全体の背景としてそのまま描く */
+  #officeWrap { position: fixed; inset: 0; z-index: 0; }
+  #officeWrap canvas { display: block; width: 100%; height: 100%; }
+  body[data-theme="office"] header { position: relative; z-index: 3; }
+
+  /* セッション詳細パネル */
+  #opanel {
+    position: fixed; right: 20px; bottom: 20px; z-index: 5;
+    width: 300px; padding: 1rem 1.1rem;
+    background: rgba(20, 26, 46, .92); backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,.14); border-radius: 16px;
+    color: #ece7da; font-size: .82rem;
+  }
+  #opanel[hidden] { display: none; }
+  #opanel .op-head { display: flex; align-items: center; margin-bottom: .35rem; }
+  #opanel .op-head b { font-size: 1rem; }
+  #op-close { margin-left: auto; background: none; border: none; color: #8a93b8; font-size: .95rem; }
+  #op-close:hover { color: #ff9090; }
+  #op-status { font-weight: 700; margin-bottom: .35rem; }
+  #op-detail {
+    font-family: "IBM Plex Mono", monospace; font-size: .66rem; color: #9aa3c0;
+    word-break: break-all; max-height: 3.2em; overflow: hidden; margin-bottom: .45rem; min-height: 1em;
+  }
+  #op-meta { font-family: "IBM Plex Mono", monospace; font-size: .64rem; color: #6a739a; margin-bottom: .7rem; }
+  .op-actions { display: flex; gap: .5rem; }
+  .op-actions button {
+    flex: 1; border: 1px solid rgba(255,255,255,.2); background: rgba(255,255,255,.07);
+    color: #ece7da; border-radius: 8px; padding: .4rem .3rem; font-size: .72rem; font-weight: 700;
+  }
+  .op-actions button:hover { background: rgba(255,255,255,.16); }
+  #op-dismiss:hover { color: #ff9090; }
+
+  /* ================= Feed ドロワー ================= */
+  #feedDrawer {
+    position: fixed; top: 0; right: 0; bottom: 0; z-index: 6;
+    width: 330px; display: flex; flex-direction: column;
+    background: rgba(16, 21, 38, .94); backdrop-filter: blur(10px);
+    border-left: 1px solid rgba(255,255,255,.12);
+    animation: slidein .25s ease;
+  }
+  #feedDrawer[hidden] { display: none; }
+  @keyframes slidein { from { transform: translateX(100%); } }
+  .fd-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: .9rem 1rem .6rem; color: #8a93b8;
+    font-family: "IBM Plex Mono", monospace; font-size: .7rem; letter-spacing: .25em;
+    border-bottom: 1px solid rgba(255,255,255,.1);
+  }
+  #feedClose { background: none; border: none; color: #8a93b8; font-size: .9rem; }
+  #feedClose:hover { color: #ff9090; }
+  #feedRows { overflow-y: auto; flex: 1; padding: .4rem 0; }
+  #feedRows::-webkit-scrollbar { width: 4px; }
+  #feedRows::-webkit-scrollbar-thumb { background: rgba(255,255,255,.2); }
+  .frow {
+    padding: .3rem 1rem; font-size: .68rem; color: #d5dae8;
+    display: grid; grid-template-columns: 50px 1fr; gap: .5rem; align-items: baseline;
+  }
+  .frow .ft { font-family: "IBM Plex Mono", monospace; font-size: .6rem; color: #5c6588; }
+  .frow .fp { color: #8a93b8; margin-right: .35em; }
+  .frow .fl { color: var(--fc, #d5dae8); font-weight: 700; }
+  .frow .fd {
+    display: block; font-family: "IBM Plex Mono", monospace; font-size: .58rem; color: #5c6588;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
 
   /* ================= テーマ選択 ================= */
   #picker {
@@ -196,17 +331,23 @@
     animation-delay: .08s;
   }
   .pick[data-t="ops"] small { color: #5c6a76; text-shadow: none; }
+  .pick[data-t="office"] {
+    font-family: "Zen Maru Gothic", sans-serif; color: #4a5b3f;
+    background: linear-gradient(145deg, #f4fbe9, #dfeccc);
+    box-shadow: 10px 10px 26px rgba(95,120,60,.4), -6px -6px 16px rgba(255,255,255,.65);
+  }
 </style>
 </head>
-<body data-theme="clay">
+<body data-theme="office">
 
 <div id="blobs"><i></i><i></i><i></i></div>
 
 <header>
   <h1 id="logo">エージェントみまもり隊</h1>
   <div class="right">
+    <button id="feedBtn" class="hbtn">Feed</button>
     <button id="themeBtn" class="hbtn">テーマ</button>
-    <button id="clearAll" class="hbtn">ぜんぶクリア</button>
+    <button id="clearAll" class="hbtn">All Clear</button>
     <span id="conn" class="off">●</span>
     <span id="clock">--:--:--</span>
   </div>
@@ -219,11 +360,32 @@
   </div>
 </main>
 
+<section id="office">
+  <div id="officeWrap"></div>
+</section>
+
+<div id="opanel" hidden>
+  <div class="op-head"><b id="op-proj"></b><button id="op-close">✕</button></div>
+  <div id="op-status"></div>
+  <div id="op-detail"></div>
+  <div id="op-meta"></div>
+  <div class="op-actions">
+    <button id="op-open">エディタで開く</button>
+    <button id="op-dismiss">消す</button>
+  </div>
+</div>
+
+<aside id="feedDrawer" hidden>
+  <div class="fd-head">LIVE FEED <button id="feedClose">✕</button></div>
+  <div id="feedRows"></div>
+</aside>
+
 <div id="picker" hidden>
-  <button class="pick" data-t="clay"><span class="icon">🧸</span>クレイ<small>やわらか3D・パステル</small></button>
+  <button class="pick" data-t="office"><span class="icon">🏢</span>オフィス<small>3Dの部屋でキャラが働く</small></button>
   <button class="pick" data-t="ops"><span class="icon">🖥️</span>管制室<small>ダークCRT・モノスペース</small></button>
 </div>
 
+<script type="module" src="/assets/office.js"></script>
 <script>
 const COLORS = ['coding','reading','searching','running','delegating','planning','thinking','waiting','idle','ended'];
 const EMOJI = {
@@ -252,20 +414,30 @@ function renderSession(s) {
     el.className = 'card';
     el.innerHTML = `
       <button class="x" title="このカードを消す">✕</button>
-      <div class="avatar"><span class="emoji"></span></div>
+      <div class="avatar">
+        <i class="ground"></i>
+        <img class="pose" alt="">
+        <span class="emoji"></span>
+      </div>
       <div class="info">
         <div class="proj"></div>
         <div class="label"></div>
         <div class="detail"></div>
         <div class="meta"><span class="elapsed"></span><span class="sid"></span></div>
       </div>`;
-    el.querySelector('.x').onclick = () =>
+    el.querySelector('.x').onclick = (e) => {
+      e.stopPropagation();
       fetch('/clear-session', { method: 'POST', body: JSON.stringify({ session_id: s.session_id }) });
+    };
+    el.onclick = () => showSessionPanel(s.session_id);                 // クリック = 詳細パネル
+    el.ondblclick = () => focusSession(s.session_id);                  // ダブルクリック = エディタへ
+    el.style.cursor = 'pointer';
   }
   el.style.setProperty('--c', `var(--c-${COLORS.includes(s.activity) ? s.activity : 'thinking'})`);
   el.classList.toggle('active', ACTIVE.has(s.activity));
   el.classList.toggle('gone', s.activity === 'ended');
   el.querySelector('.emoji').textContent = EMOJI[s.activity] || '💭';
+  setPose(el.querySelector('.avatar'), s.activity);
   el.querySelector('.proj').textContent = s.project;
   el.querySelector('.label').textContent = s.label;
   el.querySelector('.detail').textContent = s.detail || '';
@@ -279,32 +451,116 @@ function renderSession(s) {
 function removeSession(id) {
   sessions.delete(id);
   document.getElementById('s-' + id)?.remove();
+  window.Office?.remove(id);
+  if (panelForId === id) hideSessionPanel();
   empty.style.display = sessions.size ? 'none' : '';
 }
 
-function apply(s) { sessions.set(s.session_id, s); renderSession(s); }
+// assets/avatars/<activity>.png があればキャラ画像に切替（無ければ絵文字のまま）
+const poseAvailable = new Map(); // activity -> true/false（一度調べたら記憶）
+function setPose(avatar, activity) {
+  const img = avatar.querySelector('.pose');
+  if (poseAvailable.get(activity) === false) { avatar.classList.remove('img'); return; }
+  img.onload = () => { poseAvailable.set(activity, true); avatar.classList.add('img'); };
+  img.onerror = () => { poseAvailable.set(activity, false); avatar.classList.remove('img'); };
+  const src = `/assets/avatars/${activity}.png`;
+  if (img.getAttribute('src') !== src) img.src = src;
+  else if (poseAvailable.get(activity)) avatar.classList.add('img');
+}
+
+function apply(s) {
+  sessions.set(s.session_id, s);
+  renderSession(s);
+  window.Office?.upsert(s);
+  if (panelForId === s.session_id) showSessionPanel(s.session_id); // パネル表示中なら追従更新
+}
+// office.js (module) の読込完了が SSE より遅れた場合の同期
+window.addEventListener('office-ready', () => sessions.forEach((s) => window.Office.upsert(s)));
+// 3秒待っても 3D エンジンが来なければヒント欄に知らせる
+setTimeout(() => {
+  if (!window.Office) {
+    const hint = document.getElementById('officeHint');
+    if (hint) hint.textContent = '⚠ 3Dエンジンの読み込みに失敗しました（ネット接続と assets/office.js を確認）';
+  }
+}, 3000);
 
 function resetUI() {
   sessions.clear();
   grid.querySelectorAll('.card').forEach((el) => el.remove());
+  window.Office?.reset();
+  hideSessionPanel();
   empty.style.display = '';
 }
 
 document.getElementById('clearAll').onclick = () => fetch('/clear', { method: 'POST' });
+
+// --- セッション詳細パネル（バーチャルオフィス / 管制室 共通） ---
+const opanel = document.getElementById('opanel');
+let panelForId = null;
+function showSessionPanel(id) {
+  const s = sessions.get(id);
+  if (!s) return;
+  panelForId = id;
+  opanel.querySelector('#op-proj').textContent = s.project || '';
+  const st = opanel.querySelector('#op-status');
+  st.textContent = s.label || '';
+  st.style.color = `var(--c-${COLORS.includes(s.activity) ? s.activity : 'thinking'})`;
+  opanel.querySelector('#op-detail').textContent = s.detail || '';
+  opanel.querySelector('#op-meta').textContent =
+    `${s.host ? s.host + ' · ' : ''}${s.session_id.slice(0, 8)} · ${fmtElapsed(Date.now() - s.updated_at)}前`;
+  opanel.hidden = false;
+}
+function hideSessionPanel() { panelForId = null; opanel.hidden = true; }
+window.showSessionPanel = showSessionPanel;
+window.hideSessionPanel = hideSessionPanel;
+const focusSession = (id) => fetch('/focus-session', { method: 'POST', body: JSON.stringify({ session_id: id }) });
+opanel.querySelector('#op-close').onclick = hideSessionPanel;
+opanel.querySelector('#op-open').onclick = async () => {
+  if (!panelForId) return;
+  const btn = opanel.querySelector('#op-open');
+  const r = await focusSession(panelForId);
+  if (!r.ok) {
+    btn.textContent = r.status === 409 ? 'リモートのため開けません' : '開けませんでした';
+    setTimeout(() => (btn.textContent = 'エディタで開く'), 2000);
+  }
+};
+opanel.querySelector('#op-dismiss').onclick = () => {
+  if (!panelForId) return;
+  fetch('/clear-session', { method: 'POST', body: JSON.stringify({ session_id: panelForId }) });
+  hideSessionPanel();
+};
+
+// --- Feed ドロワー ---
+const feedDrawer = document.getElementById('feedDrawer');
+const feedRows = document.getElementById('feedRows');
+document.getElementById('feedBtn').onclick = () => (feedDrawer.hidden = !feedDrawer.hidden);
+document.getElementById('feedClose').onclick = () => (feedDrawer.hidden = true);
+function pushFeed(e) {
+  const row = document.createElement('div');
+  row.className = 'frow';
+  row.style.setProperty('--fc', `var(--c-${COLORS.includes(e.activity) ? e.activity : 'thinking'})`);
+  const proj = (e.host ? e.host + ':' : '') + (e.cwd ? e.cwd.split('/').pop() : '');
+  row.innerHTML = `
+    <span class="ft">${fmtTime(e.ts)}</span>
+    <span><span class="fp">${proj}</span><span class="fl">${e.label}</span>
+    <span class="fd">${(e.detail || '').replace(/</g, '&lt;')}</span></span>`;
+  feedRows.prepend(row);
+  while (feedRows.children.length > 150) feedRows.lastChild.remove();
+}
 
 // --- テーマ ---
 const picker = document.getElementById('picker');
 const logo = document.getElementById('logo');
 function setTheme(t) {
   document.body.dataset.theme = t;
-  logo.textContent = t === 'ops' ? 'AGENT OPS' : 'エージェントみまもり隊';
+  logo.textContent = t === 'ops' ? 'AGENT OPS' : 'バーチャルオフィス';
   localStorage.setItem('agentops-theme', t);
   picker.hidden = true;
 }
 document.querySelectorAll('.pick').forEach((b) => (b.onclick = () => setTheme(b.dataset.t)));
 document.getElementById('themeBtn').onclick = () => (picker.hidden = false);
 const saved = localStorage.getItem('agentops-theme');
-if (saved) setTheme(saved); else picker.hidden = false; // 初回起動はタイプ選択から
+setTheme(saved === 'ops' ? 'ops' : 'office'); // クレイは廃止、デフォルトはオフィス
 
 // --- SSE ---
 const conn = document.getElementById('conn');
@@ -313,9 +569,13 @@ es.onopen = () => { conn.className = 'on'; };
 es.onerror = () => { conn.className = 'off'; };
 es.onmessage = (m) => {
   const msg = JSON.parse(m.data);
-  if (msg.type === 'snapshot') { resetUI(); msg.sessions.forEach(apply); }
-  else if (msg.type === 'update') apply(msg.session);
-  else if (msg.type === 'clear') resetUI();
+  if (msg.type === 'snapshot') {
+    resetUI(); feedRows.innerHTML = '';
+    msg.sessions.forEach(apply);
+    (msg.events || []).forEach(pushFeed);
+  }
+  else if (msg.type === 'update') { apply(msg.session); pushFeed(msg.event); }
+  else if (msg.type === 'clear') { resetUI(); feedRows.innerHTML = ''; }
   else if (msg.type === 'remove_session') removeSession(msg.session_id);
 };
 
@@ -325,7 +585,7 @@ setInterval(() => {
   for (const s of sessions.values()) {
     const el = document.getElementById('s-' + s.session_id);
     if (!el) continue;
-    el.querySelector('.elapsed').textContent = fmtElapsed(Date.now() - s.updated_at) + 'まえ';
+    el.querySelector('.elapsed').textContent = fmtElapsed(Date.now() - s.updated_at) + '前';
     if (Date.now() - s.updated_at > 20 * 60 * 1000) el.classList.add('gone');
   }
 }, 1000);

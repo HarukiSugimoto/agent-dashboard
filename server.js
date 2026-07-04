@@ -6,6 +6,8 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
+const { exec } = require('child_process');
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 4820;
 // デフォルトはループバックのみ。Tailscale/LAN 経由で直接受けるなら BIND=0.0.0.0
@@ -69,6 +71,8 @@ function classifyClaude(h) {
   }
   if (ev === 'PostToolUse')
     return { activity: 'thinking', label: '考えている', detail: `${tool} 完了`, tool };
+  if (ev === 'Notification')
+    return { activity: 'waiting', label: '承認待ち', detail: String(h.message || '').slice(0, 120) };
   if (ev === 'Stop') return { activity: 'idle', label: '待機中', detail: '応答を完了しました' };
   if (ev === 'SessionEnd') return { activity: 'ended', label: '終了', detail: '' };
   return { activity: 'thinking', label: ev, detail: '' };
@@ -160,6 +164,33 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // セッションの作業ディレクトリをエディタで開く（EDITOR_APP で変更可、例: Zed）
+  if (req.method === 'POST' && url.pathname === '/focus-session') {
+    try {
+      const { session_id } = JSON.parse(await readBody(req));
+      const s = sessions.get(session_id);
+      if (!s || !s.cwd) { res.writeHead(404).end('unknown session'); return; }
+      if (s.host && s.host !== os.hostname().split('.')[0]) {
+        res.writeHead(409).end('remote session');
+        return;
+      }
+      // EDITOR_APP があれば最優先。なければ起動中のエディタを自動検出（Zed → VS Code）。
+      // 複数ウィンドウが並んでいても、cwd を開いているウィンドウが前面化される。
+      const dir = s.cwd.replace(/"/g, '');
+      const openIn = (app) => exec(`open -a "${app}" "${dir}"`, () => {});
+      if (process.env.EDITOR_APP) openIn(process.env.EDITOR_APP);
+      else
+        exec('pgrep -f "Zed.app/Contents/MacOS"', (err) => {
+          if (!err) openIn('Zed');
+          else openIn('Visual Studio Code');
+        });
+      res.writeHead(200).end('ok');
+    } catch (e) {
+      res.writeHead(400).end('bad json');
+    }
+    return;
+  }
+
   if (req.method === 'POST' && url.pathname === '/clear-session') {
     try {
       const { session_id } = JSON.parse(await readBody(req));
@@ -178,12 +209,13 @@ const server = http.createServer(async (req, res) => {
       'Cache-Control': 'no-cache',
       Connection: 'keep-alive',
     });
-    // 古い残骸を起動時に見せない: 直近2時間に動きのあったセッションのみ
+    // 古い残骸を起動時に見せない: セッションは直近2時間、Feed用イベントは直近1時間のみ
     const now = Date.now();
     res.write(
       `data: ${JSON.stringify({
         type: 'snapshot',
         sessions: [...sessions.values()].filter((s) => now - s.updated_at < 2 * 3600e3),
+        events: events.slice(-80).filter((e) => now - e.ts < 3600e3),
       })}\n\n`
     );
     clients.add(res);
@@ -195,6 +227,21 @@ const server = http.createServer(async (req, res) => {
     fs.readFile(path.join(__dirname, 'index.html'), (err, data) => {
       if (err) return res.writeHead(500).end('index.html not found');
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }).end(data);
+    });
+    return;
+  }
+
+  // アバター画像などの静的ファイル配信
+  if (url.pathname.startsWith('/assets/')) {
+    const fp = path.join(__dirname, path.normalize(url.pathname));
+    if (!fp.startsWith(path.join(__dirname, 'assets'))) {
+      res.writeHead(403).end('forbidden');
+      return;
+    }
+    const MIME = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.svg': 'image/svg+xml', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
+    fs.readFile(fp, (err, data) => {
+      if (err) return res.writeHead(404).end('not found');
+      res.writeHead(200, { 'Content-Type': MIME[path.extname(fp).toLowerCase()] || 'application/octet-stream', 'Cache-Control': 'max-age=60' }).end(data);
     });
     return;
   }

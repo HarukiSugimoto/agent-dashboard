@@ -152,17 +152,27 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === 'POST' && url.pathname === '/clear') {
+    events.length = 0;
+    sessions.clear();
+    broadcast({ type: 'clear' });
+    res.writeHead(200).end('ok');
+    return;
+  }
+
   if (url.pathname === '/stream') {
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
       Connection: 'keep-alive',
     });
+    // 古い残骸を起動時に見せない: イベントは直近1時間、セッションは直近2時間のみ
+    const now = Date.now();
     res.write(
       `data: ${JSON.stringify({
         type: 'snapshot',
-        sessions: [...sessions.values()],
-        events: events.slice(-100),
+        sessions: [...sessions.values()].filter((s) => now - s.updated_at < 2 * 3600e3),
+        events: events.slice(-100).filter((e) => now - e.ts < 3600e3),
       })}\n\n`
     );
     clients.add(res);

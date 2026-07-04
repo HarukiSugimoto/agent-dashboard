@@ -68,6 +68,13 @@
   #conn.on  { color: var(--c-coding); }
   #conn.off { color: var(--c-waiting); animation: blink 1s steps(2) infinite; }
   @keyframes blink { 50% { opacity: .25; } }
+  #clear {
+    font-family: "IBM Plex Mono", monospace; font-size: .62rem; letter-spacing: .18em;
+    background: none; border: 1px solid var(--faint); border-radius: 3px;
+    color: var(--dim); padding: .2rem .55rem; cursor: pointer;
+    transition: color .2s, border-color .2s;
+  }
+  #clear:hover { color: var(--c-waiting); border-color: var(--c-waiting); }
 
   /* ---------- layout ---------- */
   .wrap {
@@ -177,6 +184,7 @@
   <h1>AGENT OPS</h1>
   <span class="sub">エージェント監視室 / PHASE 1</span>
   <div class="right">
+    <button id="clear" title="表示とサーバー上の履歴をクリア">CLEAR</button>
     <span id="conn" class="off">● CONNECTING</span>
     <span id="clock" class="mono">--:--:--</span>
   </div>
@@ -271,6 +279,16 @@ function renderEvent(e) {
 
 function apply(s) { sessions.set(s.session_id, s); renderSession(s); }
 
+// 画面を空にする（再接続時のスナップショット反映前と CLEAR 時に使う）
+function resetUI() {
+  sessions.clear();
+  grid.querySelectorAll('.card').forEach((el) => el.remove());
+  feed.innerHTML = '';
+  empty.style.display = '';
+}
+
+document.getElementById('clear').onclick = () => fetch('/clear', { method: 'POST' });
+
 // --- SSE ---
 const conn = document.getElementById('conn');
 function connect() {
@@ -280,11 +298,14 @@ function connect() {
   es.onmessage = (m) => {
     const msg = JSON.parse(m.data);
     if (msg.type === 'snapshot') {
+      resetUI();
       msg.sessions.forEach(apply);
       msg.events.forEach(renderEvent);
     } else if (msg.type === 'update') {
       apply(msg.session);
       renderEvent(msg.event);
+    } else if (msg.type === 'clear') {
+      resetUI();
     }
   };
 }

@@ -28,6 +28,15 @@ open http://localhost:4820
 
 Claude Code 側は `hooks-snippet.json` の `hooks` ブロックを `~/.claude/settings.json` に追加すると、全セッションのイベントが流れ込む（`hooks/claude-hook.sh` のパスは環境に合わせて変更）。フックは非同期・失敗無視で送るため、コレクタが落ちていてもセッションは遅くならない。
 
+## Mac アプリ
+
+ブラウザタブだとバックグラウンド時に描画が間引かれるため、専用の WebView アプリを用意している（コレクタも自動起動する）。
+
+```bash
+./app/build.sh          # swiftc でビルド（Xcode プロジェクト不要）
+open AgentOps.app
+```
+
 ## ファイル構成
 
 | ファイル | 役割 |

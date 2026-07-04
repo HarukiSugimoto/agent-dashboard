@@ -177,6 +177,14 @@ const server = http.createServer(async (req, res) => {
   res.writeHead(404).end('not found');
 });
 
+// Nagle アルゴリズムによる送信バッファリング（最大 ~40ms）を無効化
+server.on('connection', (socket) => socket.setNoDelay(true));
+
+// 15秒ごとの SSE ハートビート（プロキシ等による接続切断を防ぐ）
+setInterval(() => {
+  for (const res of clients) res.write(': ping\n\n');
+}, 15000);
+
 server.listen(PORT, '127.0.0.1', () => {
   console.log(`agent-dashboard collector: http://localhost:${PORT}`);
 });

@@ -4,7 +4,8 @@
 # コレクタが落ちていても Claude Code 本体を一切ブロックしないよう、
 # バックグラウンド・短タイムアウト・失敗無視で送る。
 INPUT=$(cat)
-(curl -s --max-time 2 -X POST http://127.0.0.1:4820/ingest/claude \
+(curl -s --noproxy '*' --connect-timeout 0.5 --max-time 1 \
+  -X POST http://127.0.0.1:4820/ingest/claude \
   -H 'Content-Type: application/json' \
-  --data-binary "$INPUT" >/dev/null 2>&1 &)
+  --data-binary "$INPUT" -o /dev/null 2>/dev/null &)
 exit 0

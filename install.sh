@@ -24,7 +24,7 @@ except FileNotFoundError:
     settings = {}
 
 hooks = settings.setdefault("hooks", {})
-events = ["SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "Notification", "Stop", "SessionEnd"]
+events = ["SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "Notification", "SubagentStop", "Stop", "SessionEnd"]
 
 for ev in events:
     groups = hooks.setdefault(ev, [])

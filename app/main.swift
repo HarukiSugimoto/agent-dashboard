@@ -22,7 +22,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         window.title = "AGENT OPS"
         window.titlebarAppearsTransparent = true
         window.backgroundColor = NSColor(red: 0.027, green: 0.035, blue: 0.043, alpha: 1)
-        window.minSize = NSSize(width: 700, height: 420)
+        window.minSize = NSSize(width: 260, height: 180)
         window.center()
         window.setFrameAutosaveName("AgentOpsMain")
 
@@ -53,18 +53,23 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         guard let node = candidates.first(where: { FileManager.default.fileExists(atPath: $0) }) else { return }
 
         // .app はプロジェクトルート直下に置かれる想定: <project>/AgentOps.app
-        let projectDir = (Bundle.main.bundlePath as NSString).deletingLastPathComponent
-        var serverJS = projectDir + "/server.js"
-        if !FileManager.default.fileExists(atPath: serverJS) {
-            serverJS = NSString(string: "~/Desktop/個人開発/agent-dashboard/server.js").expandingTildeInPath
+        var projectDir = (Bundle.main.bundlePath as NSString).deletingLastPathComponent
+        if !FileManager.default.fileExists(atPath: projectDir + "/server.js") {
+            projectDir = NSString(string: "~/Desktop/個人開発/agent-dashboard").expandingTildeInPath
         }
 
-        let p = Process()
-        p.executableURL = URL(fileURLWithPath: node)
-        p.arguments = [serverJS]
-        p.standardOutput = FileHandle.nullDevice
-        p.standardError = FileHandle.nullDevice
-        try? p.run()
+        // コレクタと Codex アダプタを起動する。多重起動しても実害は無い
+        // （コレクタは EADDRINUSE で即終了、アダプタはポーリングが重複するだけ）。
+        for script in ["/server.js", "/adapters/codex-adapter.js"] {
+            let full = projectDir + script
+            guard FileManager.default.fileExists(atPath: full) else { continue }
+            let p = Process()
+            p.executableURL = URL(fileURLWithPath: node)
+            p.arguments = [full]
+            p.standardOutput = FileHandle.nullDevice
+            p.standardError = FileHandle.nullDevice
+            try? p.run()
+        }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }

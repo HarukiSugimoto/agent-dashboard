@@ -239,16 +239,20 @@ const ACT_COLOR = {
 };
 
 function makeBubbleTexture(project, label, activity) {
+  const SS = 3; // スーパーサンプリング（高解像度で描いて縮小 → くっきり）
   const H = 56, r = 24;
-  const cv = document.createElement('canvas');
-  const c = cv.getContext('2d');
+  const measure = document.createElement('canvas').getContext('2d');
   const nameFont = '700 26px "Zen Maru Gothic", sans-serif';
   const stFont = '700 21px "Zen Maru Gothic", sans-serif';
   const name = project.length > 16 ? project.slice(0, 15) + '…' : project;
-  c.font = nameFont; const w1 = c.measureText(name).width;
-  c.font = stFont; const w2 = c.measureText(label).width;
+  measure.font = nameFont; const w1 = measure.measureText(name).width;
+  measure.font = stFont; const w2 = measure.measureText(label).width;
   const W = Math.ceil(w1 + w2 + 46);
-  cv.width = W; cv.height = H;
+
+  const cv = document.createElement('canvas');
+  cv.width = W * SS; cv.height = H * SS;
+  const c = cv.getContext('2d');
+  c.scale(SS, SS);
   const waiting = activity === 'waiting';
   c.fillStyle = waiting ? 'rgba(120,28,28,.92)' : 'rgba(16,20,38,.82)';
   c.beginPath(); c.roundRect(2, 2, W - 4, H - 4, r); c.fill();
@@ -260,8 +264,13 @@ function makeBubbleTexture(project, label, activity) {
   c.fillStyle = ACT_COLOR[activity] || '#aab8d8';
   c.font = stFont;
   c.fillText(label, 18 + w1 + 12, H / 2 + 2);
+
   const tex = new THREE.CanvasTexture(cv);
   tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.generateMipmaps = true;
   return { tex, aspect: W / H };
 }
 
@@ -334,6 +343,7 @@ function upsert(s) {
   ch.updated = s.updated_at || Date.now();
   ch.leaving = s.activity === 'ended';
   ch.ring.visible = s.activity === 'waiting';
+  syncSatellites(ch, (s.subagents || []).filter((x) => x.status === 'running').length);
   setBubble(ch);
   const t = targetFor(s);
   if (t) { ch.tx = t.x; ch.ty = t.z; }
@@ -346,6 +356,19 @@ function remove(id) {
   seatOf.delete(id);
 }
 function reset() { for (const id of [...chars.keys()]) remove(id); }
+
+// 稼働中サブエージェントの数だけ、親キャラの周りを回る小さな子分を用意する
+const SAT_MAT = new THREE.MeshStandardMaterial({ color: '#f8a8c8', emissive: '#f8a8c8', emissiveIntensity: 0.5, roughness: 0.6 });
+function syncSatellites(ch, n) {
+  ch.sats = ch.sats || [];
+  while (ch.sats.length < n) {
+    const s = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 10), SAT_MAT);
+    s.castShadow = true;
+    ch.mesh.add(s);
+    ch.sats.push(s);
+  }
+  while (ch.sats.length > n) ch.mesh.remove(ch.sats.pop());
+}
 
 // ---------- メインループ ----------
 const clock = new THREE.Clock();
@@ -391,6 +414,14 @@ function tick() {
     }
     ch.mesh.position.x = ch.x;
     ch.mesh.position.z = ch.z;
+    // 子分（サブエージェント）を頭の周りで公転させる
+    if (ch.sats && ch.sats.length) {
+      const R = 0.5, n = ch.sats.length;
+      ch.sats.forEach((s, i) => {
+        const a = t / 620 + (i / n) * Math.PI * 2;
+        s.position.set(Math.cos(a) * R, 1.35 + Math.sin(t / 300 + i) * 0.06, Math.sin(a) * R);
+      });
+    }
   }
   renderer.render(scene, camera);
 }

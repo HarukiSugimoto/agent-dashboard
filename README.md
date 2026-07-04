@@ -3,17 +3,19 @@
 AIコーディングエージェント（Claude Code / Codex）のセッションが「今何をしているか」を
 リアルタイムに可視化するダッシュボード。3Dバーチャルオフィスと管制室リストの2ビューを持つ。
 
-![status](https://img.shields.io/badge/phase-1-green)
+![status](https://img.shields.io/badge/phase-2-green)
 
 ## 仕組み
 
 ```
-[Claude Code hooks] ──┐
-                      ├─→ collector (server.js, SSE) ─→ dashboard (index.html)
-[Codex adapter (予定)]┘
+[Claude Code hooks]  ──┐
+                       ├─→ collector (server.js, SSE) ─→ dashboard (index.html)
+[Codex adapter]      ──┘
 ```
 
 - エージェントごとの**アダプタ**がイベントを共通形式に変換してコレクタに POST
+  - Claude Code: hooks が各イベントを直接 POST
+  - Codex: `~/.codex` のセッション DB をポーリングするアダプタが POST
 - **コレクタ**がツール名を coding / reading / searching / running… のアクティビティに分類し、SSE でブラウザにプッシュ
 - **UI** はエージェント非依存。セッション＝キャラクター／行として表示
 
@@ -71,6 +73,27 @@ open http://localhost:4820  # ダッシュボード
 - `EDITOR_APP="Zed"`（または `"Visual Studio Code"`）で固定も可
 - リモートマシンのセッションは cwd が手元に無いため開けない（その旨を表示）
 
+## Codex 対応
+
+Codex は hooks を持たないため、CLI が書き出すセッション記録をポーリングするアダプタで対応する。
+
+```bash
+node adapters/codex-adapter.js   # コレクタと併せて起動（Mac アプリなら自動起動）
+```
+
+- `~/.codex/state_5.sqlite` の `threads` テーブルから稼働中セッション（cwd・title・tokens_used）を取得
+- 各セッションの `rollout_path`（JSONL）末尾を読み、直近イベントをアクティビティに変換
+  - 実データで確認済み: `task_started`→考えている / `task_complete`→待機中 / `message`→応答中
+  - ツール系（`exec_command_begin`→実行中 / `patch_apply_begin`→編集中 / `web_search`→検索中）は Codex の標準イベント名にマップ
+- `sqlite3` CLI を使うため追加依存なし。環境変数 `AGENT_DASH_URL` / `CODEX_DB` / `POLL_MS` で調整可
+
+Codex CLI のセットアップ（API キー認証）:
+
+```bash
+curl -fsSL https://chatgpt.com/codex/install.sh | sh   # インストール
+echo "sk-..." | codex login --with-api-key             # 認証
+```
+
 ## リモートマシンのセッションを見る
 
 イベントには送信元ホスト名が付き、ダッシュボード上でマシンごとに区別される。
@@ -118,6 +141,7 @@ open AgentOps.app
 | ファイル | 役割 |
 |---|---|
 | `server.js` | コレクタ。イベント受信・分類・SSE配信・エディタ起動 |
+| `adapters/codex-adapter.js` | Codex セッションDBをポーリングして送信 |
 | `assets/office.js` | 3Dバーチャルオフィス（three.js） |
 | `index.html` | ダッシュボード UI（2ビュー・詳細パネル・Feedドロワー） |
 | `hooks/claude-hook.sh` | Claude Code hook → コレクタ転送スクリプト |
@@ -142,5 +166,6 @@ open AgentOps.app
 - [x] Phase 1: Claude Code 対応（hooks → collector → SSE dashboard）
 - [x] 3Dバーチャルオフィス / 管制室リスト / 詳細パネル / エディタ遷移 / 承認待ち表示
 - [x] Mac アプリ・マルチマシン対応（SSHトンネル / ホスト名区別）
-- [ ] Phase 2: Codex アダプタ（`~/.codex/logs_2.sqlite` の tail）
-- [ ] トークン消費・セッション履歴の集計ビュー
+- [x] トークン / コンテキスト使用量ゲージ・サブエージェント表示
+- [x] Phase 2: Codex アダプタ（`~/.codex` セッションDB + rollout のポーリング）
+- [ ] セッション履歴の集計ビュー

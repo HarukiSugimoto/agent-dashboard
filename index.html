@@ -78,20 +78,17 @@
   }
 
   /* ================= ヘッダー ================= */
-  header { position: relative; z-index: 2; display: flex; align-items: center; gap: 1rem; padding: 1.2rem 1.8rem .9rem; }
-  h1 { font-size: 1.25rem; font-weight: 800; letter-spacing: .06em; }
-  body[data-theme="clay"] h1, body[data-theme="office"] h1 { font-family: "Baloo 2", "Zen Maru Gothic", sans-serif; color: #6b5642; text-shadow: 0 2px 0 #fff; }
-  body[data-theme="ops"] h1 { font-family: "IBM Plex Mono", monospace; font-size: 1rem; letter-spacing: .35em; color: var(--c-coding); text-shadow: 0 0 12px rgba(61,214,140,.45); }
+  /* ヘッダーは全テーマ共通 */
+  header { position: relative; z-index: 3; display: flex; align-items: center; gap: 1rem; padding: .7rem 1.2rem .6rem; }
+  h1 { font-family: "IBM Plex Mono", monospace; font-size: .95rem; font-weight: 700; letter-spacing: .32em; color: #3dd68c; text-shadow: 0 0 12px rgba(61,214,140,.4); }
   header .right { margin-left: auto; display: flex; gap: .7rem; align-items: center; }
   #clock { font-family: "IBM Plex Mono", monospace; font-size: .9rem; color: var(--dim); }
   #conn { font-size: .7rem; }
   #conn.on { color: var(--c-coding); } #conn.off { color: var(--c-waiting); animation: blink 1s steps(2) infinite; }
   @keyframes blink { 50% { opacity: .2; } }
 
-  .hbtn { border: none; font-weight: 700; font-size: .74rem; padding: .45rem .9rem; border-radius: 999px; color: var(--dim); background: var(--card-hi); transition: transform .15s, color .2s; }
-  body[data-theme="clay"] .hbtn, body[data-theme="office"] .hbtn { box-shadow: 3px 3px 8px var(--sh-dark), -3px -3px 8px var(--sh-light); }
-  body[data-theme="ops"]  .hbtn { background: none; border: 1px solid #38434d; border-radius: 4px; font-family: "IBM Plex Mono", monospace; letter-spacing: .1em; }
-  .hbtn:hover { color: var(--c-waiting); transform: translateY(-1px); }
+  .hbtn { background: none; border: 1px solid #38434d; border-radius: 5px; font-family: "IBM Plex Mono", monospace; font-weight: 600; font-size: .68rem; letter-spacing: .1em; padding: .35rem .7rem; color: var(--dim); transition: transform .15s, color .2s, border-color .2s; }
+  .hbtn:hover { color: var(--c-coding); border-color: var(--c-coding); transform: translateY(-1px); }
   .hbtn:active { transform: scale(.94); }
 
   /* ================= カードグリッド ================= */
@@ -130,8 +127,6 @@
   body[data-theme="ops"] .meta .sid { grid-area: 2 / 3; font-family: "IBM Plex Mono", monospace; font-size: .56rem; color: var(--faint); }
   body[data-theme="ops"] .card:hover { transform: none; }
   body[data-theme="ops"] .x { top: 50%; transform: translateY(-50%); width: 20px; height: 20px; font-size: .65rem; }
-  body[data-theme="ops"] header { padding: .6rem 1rem .5rem; }
-  body[data-theme="ops"] header h1 { font-size: .8rem; }
   body[data-theme="ops"] .card.active { box-shadow: -6px 0 24px -12px var(--c); }
   .card:hover { transform: translateY(-5px) rotate(-.4deg); }
   .card.gone { opacity: .4; }
@@ -232,14 +227,12 @@
     --sh-dark: rgba(0, 0, 0, .55); --sh-light: rgba(255, 255, 255, .05);
   }
   body[data-theme="office"] #blobs { display: none; }
-  body[data-theme="office"] h1 { color: #f4e8cf; text-shadow: 0 0 16px rgba(255, 196, 130, .4); }
   #office { display: none; }
   body[data-theme="office"] #grid { display: none; }
   body[data-theme="office"] #office { display: block; }
   /* 部屋は画面全体の背景としてそのまま描く */
   #officeWrap { position: fixed; inset: 0; z-index: 0; }
   #officeWrap canvas { display: block; width: 100%; height: 100%; }
-  body[data-theme="office"] header { position: relative; z-index: 3; }
 
   /* セッション詳細パネル */
   #opanel {
@@ -259,6 +252,26 @@
     font-family: "IBM Plex Mono", monospace; font-size: .66rem; color: #9aa3c0;
     word-break: break-all; max-height: 3.2em; overflow: hidden; margin-bottom: .45rem; min-height: 1em;
   }
+  #op-gauges { margin: .1rem 0 .6rem; }
+  #op-gauges .g { margin-bottom: .5rem; }
+  #op-gauges .g-top {
+    display: flex; justify-content: space-between;
+    font-size: .64rem; color: #b8c0dc; margin-bottom: .2rem;
+  }
+  #op-gauges .g-top b { font-weight: 700; }
+  #op-gauges .g-top span { font-family: "IBM Plex Mono", monospace; color: #8a93b8; }
+  #op-gauges .bar { height: 7px; border-radius: 999px; background: rgba(255,255,255,.09); overflow: hidden; }
+  #op-gauges .fill { height: 100%; border-radius: 999px; transition: width .5s ease, background .3s; }
+  #op-gauges .none { font-size: .62rem; color: #6a739a; font-family: "IBM Plex Mono", monospace; }
+  #op-subs { margin-bottom: .6rem; }
+  #op-subs .s-title { font-size: .62rem; color: #8a93b8; margin-bottom: .3rem; letter-spacing: .05em; }
+  #op-subs .s-row { display: flex; align-items: baseline; gap: .4rem; font-size: .68rem; padding: .12rem 0; }
+  #op-subs .s-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  #op-subs .s-dot.run { background: var(--c-delegating); box-shadow: 0 0 6px var(--c-delegating); animation: blink 1.1s steps(2) infinite; }
+  #op-subs .s-dot.done { background: #4a5478; }
+  #op-subs .s-type { font-family: "IBM Plex Mono", monospace; font-size: .6rem; color: #c9a7f0; flex-shrink: 0; }
+  #op-subs .s-desc { color: #b8c0dc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #op-subs .s-row.done .s-desc, #op-subs .s-row.done .s-type { opacity: .5; }
   #op-meta { font-family: "IBM Plex Mono", monospace; font-size: .64rem; color: #6a739a; margin-bottom: .7rem; }
   .op-actions { display: flex; gap: .5rem; }
   .op-actions button {
@@ -301,41 +314,53 @@
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
 
-  /* ================= テーマ選択 ================= */
+  /* ================= ビュー選択 ================= */
   #picker {
     position: fixed; inset: 0; z-index: 200;
-    display: flex; gap: 2rem; align-items: center; justify-content: center;
-    background: rgba(30, 24, 16, .45); backdrop-filter: blur(8px);
+    display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(ellipse at 50% 30%, rgba(30,40,66,.55), rgba(8,11,20,.82));
+    backdrop-filter: blur(12px);
   }
   #picker[hidden] { display: none; }
+  .pk-panel { animation: appear .4s cubic-bezier(.34,1.56,.64,1) backwards; }
+  .pk-head { text-align: center; margin-bottom: 1.6rem; }
+  .pk-head h2 {
+    font-family: "IBM Plex Mono", monospace; font-size: 1rem; font-weight: 700;
+    letter-spacing: .4em; color: #e6e2d6; margin-bottom: .5rem;
+  }
+  .pk-head p { font-size: .74rem; color: #8a93b8; }
+  .pk-cards { display: flex; gap: 1.4rem; }
   .pick {
-    width: 240px; padding: 2rem 1.6rem; text-align: center;
-    border-radius: 30px; border: none;
-    font-weight: 700; font-size: 1.05rem;
-    transition: transform .2s;
+    width: 260px; padding: 1rem 1rem 1.15rem; cursor: pointer; text-align: left;
+    border-radius: 20px; border: 1px solid rgba(255,255,255,.1);
+    background: linear-gradient(160deg, rgba(28,35,58,.9), rgba(18,23,40,.9));
+    transition: transform .22s, border-color .22s, box-shadow .22s;
     animation: appear .5s cubic-bezier(.34,1.56,.64,1) backwards;
   }
-  .pick:hover { transform: translateY(-6px) scale(1.03); }
-  .pick .icon { font-size: 3rem; display: block; margin-bottom: .8rem; }
-  .pick small { display: block; font-weight: 500; font-size: .72rem; margin-top: .5rem; opacity: .75; }
-  .pick[data-t="clay"] {
-    font-family: "Zen Maru Gothic", sans-serif; color: #5b4a3a;
-    background: linear-gradient(145deg, #fffdf8, #f1e7d8);
-    box-shadow: 10px 10px 26px rgba(120,95,60,.45), -6px -6px 16px rgba(255,255,255,.6);
+  .pick:nth-child(2) { animation-delay: .07s; }
+  .pick:hover { transform: translateY(-6px); border-color: rgba(61,214,140,.55); box-shadow: 0 18px 40px -18px rgba(61,214,140,.5); }
+  .pick.active { border-color: rgba(61,214,140,.8); }
+  .pick.active .pk-name::after { content: " ●"; color: #3dd68c; font-size: .6rem; vertical-align: middle; }
+  .pk-prev { height: 128px; border-radius: 12px; overflow: hidden; position: relative; margin-bottom: .8rem; }
+  /* Office プレビュー: 夜のオフィスの光 */
+  .pk-prev-office { background: linear-gradient(165deg, #2a3350 0%, #1a2138 60%, #141a2e 100%); }
+  .pk-prev-office::before {
+    content: ""; position: absolute; left: 14%; bottom: 0; width: 72%; height: 34%;
+    background: linear-gradient(180deg, transparent, rgba(255,190,120,.16));
   }
-  .pick[data-t="ops"] {
-    font-family: "IBM Plex Mono", monospace; color: #3dd68c; letter-spacing: .1em;
-    background: linear-gradient(160deg, #10161b, #0a0e11);
-    border: 1px solid #1c242c; border-radius: 10px;
-    text-shadow: 0 0 10px rgba(61,214,140,.5);
-    animation-delay: .08s;
-  }
-  .pick[data-t="ops"] small { color: #5c6a76; text-shadow: none; }
-  .pick[data-t="office"] {
-    font-family: "Zen Maru Gothic", sans-serif; color: #4a5b3f;
-    background: linear-gradient(145deg, #f4fbe9, #dfeccc);
-    box-shadow: 10px 10px 26px rgba(95,120,60,.4), -6px -6px 16px rgba(255,255,255,.65);
-  }
+  .pk-prev-office span { position: absolute; border-radius: 50%; filter: blur(1px); }
+  .pk-prev-office span:nth-child(1) { width: 40px; height: 40px; background: radial-gradient(circle at 35% 30%, #fff, #ffbe78); top: 26px; left: 40px; box-shadow: 0 0 22px #ffab5c; }
+  .pk-prev-office span:nth-child(2) { width: 10px; height: 10px; background: #7ef2a0; top: 20px; right: 34px; box-shadow: 0 0 12px #7ef2a0; }
+  .pk-prev-office span:nth-child(3) { width: 8px; height: 8px; background: #f8a8c8; bottom: 30px; right: 54px; box-shadow: 0 0 10px #f8a8c8; }
+  /* Console プレビュー: 高密度リストの行 */
+  .pk-prev-ops { background: linear-gradient(160deg, #0c1014, #070a0d); padding: 12px; display: flex; flex-direction: column; gap: 7px; }
+  .pk-prev-ops i { display: block; height: 12px; border-radius: 3px; border-left: 3px solid var(--pc, #3dd68c); background: rgba(255,255,255,.05); }
+  .pk-prev-ops i:nth-child(1) { --pc: #3dd68c; width: 94%; }
+  .pk-prev-ops i:nth-child(2) { --pc: #ffb454; width: 82%; }
+  .pk-prev-ops i:nth-child(3) { --pc: #4cc3ff; width: 90%; }
+  .pk-prev-ops i:nth-child(4) { --pc: #ff5c8a; width: 74%; }
+  .pk-name { font-family: "IBM Plex Mono", monospace; font-size: 1.05rem; font-weight: 700; color: #f0ece0; letter-spacing: .05em; }
+  .pk-desc { font-size: .72rem; color: #8a93b8; margin-top: .25rem; }
 </style>
 </head>
 <body data-theme="office">
@@ -343,7 +368,7 @@
 <div id="blobs"><i></i><i></i><i></i></div>
 
 <header>
-  <h1 id="logo">エージェントみまもり隊</h1>
+  <h1 id="logo">AGENT OPS</h1>
   <div class="right">
     <button id="feedBtn" class="hbtn">Feed</button>
     <button id="themeBtn" class="hbtn">テーマ</button>
@@ -368,6 +393,8 @@
   <div class="op-head"><b id="op-proj"></b><button id="op-close">✕</button></div>
   <div id="op-status"></div>
   <div id="op-detail"></div>
+  <div id="op-gauges"></div>
+  <div id="op-subs"></div>
   <div id="op-meta"></div>
   <div class="op-actions">
     <button id="op-open">エディタで開く</button>
@@ -381,8 +408,24 @@
 </aside>
 
 <div id="picker" hidden>
-  <button class="pick" data-t="office"><span class="icon">🏢</span>オフィス<small>3Dの部屋でキャラが働く</small></button>
-  <button class="pick" data-t="ops"><span class="icon">🖥️</span>管制室<small>ダークCRT・モノスペース</small></button>
+  <div class="pk-panel">
+    <div class="pk-head">
+      <h2>SELECT VIEW</h2>
+      <p>セッションの見せ方を選べます・後からいつでも切り替えできます</p>
+    </div>
+    <div class="pk-cards">
+      <button class="pick" data-t="office">
+        <div class="pk-prev pk-prev-office"><span></span><span></span><span></span></div>
+        <div class="pk-name">Office</div>
+        <div class="pk-desc">3Dの部屋でキャラクターが働く</div>
+      </button>
+      <button class="pick" data-t="ops">
+        <div class="pk-prev pk-prev-ops"><i></i><i></i><i></i><i></i></div>
+        <div class="pk-name">Console</div>
+        <div class="pk-desc">高密度リストで数を一覧</div>
+      </button>
+    </div>
+  </div>
 </div>
 
 <script type="module" src="/assets/office.js"></script>
@@ -506,9 +549,42 @@ function showSessionPanel(id) {
   st.textContent = s.label || '';
   st.style.color = `var(--c-${COLORS.includes(s.activity) ? s.activity : 'thinking'})`;
   opanel.querySelector('#op-detail').textContent = s.detail || '';
+  renderGauges(s.tokens);
+  renderSubs(s.subagents);
   opanel.querySelector('#op-meta').textContent =
     `${s.host ? s.host + ' · ' : ''}${s.session_id.slice(0, 8)} · ${fmtElapsed(Date.now() - s.updated_at)}前`;
   opanel.hidden = false;
+}
+const kfmt = (n) =>
+  n >= 1e6 ? (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M'
+  : n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1) + 'k'
+  : String(n);
+function renderGauges(tok) {
+  const box = opanel.querySelector('#op-gauges');
+  if (!tok) { box.innerHTML = '<div class="none">トークン情報なし（リモートセッション等）</div>'; return; }
+  let html = '';
+  if (tok.ctx > 0) { // コンテキスト量が取れる場合だけバーを出す（Codex は累計のみ）
+    const pct = Math.min(100, Math.round((tok.ctx / tok.ctxMax) * 100));
+    const color = pct < 70 ? 'var(--c-coding)' : pct < 90 ? 'var(--c-planning)' : 'var(--c-waiting)';
+    html += `<div class="g">
+      <div class="g-top"><b>コンテキスト</b><span>${kfmt(tok.ctx)} / ${kfmt(tok.ctxMax)} (${pct}%)</span></div>
+      <div class="bar"><div class="fill" style="width:${pct}%;background:${color}"></div></div>
+    </div>`;
+  }
+  if (tok.out > 0) html += `<div class="g"><div class="g-top"><b>累計トークン</b><span>${kfmt(tok.out)}</span></div></div>`;
+  box.innerHTML = html;
+}
+function renderSubs(subs) {
+  const box = opanel.querySelector('#op-subs');
+  if (!subs || !subs.length) { box.innerHTML = ''; return; }
+  const running = subs.filter((s) => s.status === 'running').length;
+  const rows = subs.slice().reverse().map((s) => `
+    <div class="s-row ${s.status}">
+      <span class="s-dot ${s.status === 'running' ? 'run' : 'done'}"></span>
+      <span class="s-type">${s.type}</span>
+      <span class="s-desc">${(s.desc || '').replace(/</g, '&lt;')}</span>
+    </div>`).join('');
+  box.innerHTML = `<div class="s-title">サブエージェント（稼働 ${running} / 計 ${subs.length}）</div>${rows}`;
 }
 function hideSessionPanel() { panelForId = null; opanel.hidden = true; }
 window.showSessionPanel = showSessionPanel;
@@ -533,8 +609,12 @@ opanel.querySelector('#op-dismiss').onclick = () => {
 // --- Feed ドロワー ---
 const feedDrawer = document.getElementById('feedDrawer');
 const feedRows = document.getElementById('feedRows');
-document.getElementById('feedBtn').onclick = () => (feedDrawer.hidden = !feedDrawer.hidden);
+const feedBtn = document.getElementById('feedBtn');
+feedBtn.onclick = (e) => { e.stopPropagation(); feedDrawer.hidden = !feedDrawer.hidden; };
 document.getElementById('feedClose').onclick = () => (feedDrawer.hidden = true);
+// ドロワーの外側をクリックしたら閉じる（ドロワー内クリックは伝播させない）
+feedDrawer.addEventListener('click', (e) => e.stopPropagation());
+document.addEventListener('click', () => { if (!feedDrawer.hidden) feedDrawer.hidden = true; });
 function pushFeed(e) {
   const row = document.createElement('div');
   row.className = 'frow';
@@ -548,19 +628,25 @@ function pushFeed(e) {
   while (feedRows.children.length > 150) feedRows.lastChild.remove();
 }
 
-// --- テーマ ---
+// --- ビュー（テーマ）選択 ---
 const picker = document.getElementById('picker');
-const logo = document.getElementById('logo');
+const picks = [...document.querySelectorAll('.pick')];
 function setTheme(t) {
   document.body.dataset.theme = t;
-  logo.textContent = t === 'ops' ? 'AGENT OPS' : 'バーチャルオフィス';
   localStorage.setItem('agentops-theme', t);
+  picks.forEach((b) => b.classList.toggle('active', b.dataset.t === t));
   picker.hidden = true;
 }
-document.querySelectorAll('.pick').forEach((b) => (b.onclick = () => setTheme(b.dataset.t)));
-document.getElementById('themeBtn').onclick = () => (picker.hidden = false);
+function openPicker() {
+  picks.forEach((b) => b.classList.toggle('active', b.dataset.t === document.body.dataset.theme));
+  picker.hidden = false;
+}
+picks.forEach((b) => (b.onclick = () => setTheme(b.dataset.t)));
+document.getElementById('themeBtn').onclick = openPicker;
+// パネル外クリックで閉じる
+picker.addEventListener('click', (e) => { if (e.target === picker) picker.hidden = true; });
 const saved = localStorage.getItem('agentops-theme');
-setTheme(saved === 'ops' ? 'ops' : 'office'); // クレイは廃止、デフォルトはオフィス
+setTheme(saved === 'ops' ? 'ops' : 'office'); // 既定は Office
 
 // --- SSE ---
 const conn = document.getElementById('conn');

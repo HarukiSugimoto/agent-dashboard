@@ -13,6 +13,7 @@ const PORT = process.env.PORT ? Number(process.env.PORT) : 4820;
 // デフォルトはループバックのみ。Tailscale/LAN 経由で直接受けるなら BIND=0.0.0.0
 const BIND = process.env.BIND || '127.0.0.1';
 const MAX_EVENTS = 500;
+const CONTEXT_WINDOW = process.env.CONTEXT_WINDOW ? Number(process.env.CONTEXT_WINDOW) : 1000000;
 
 const sessions = new Map(); // session_id -> session state
 const events = [];          // 直近イベントのリングバッファ
@@ -73,12 +74,66 @@ function classifyClaude(h) {
     return { activity: 'thinking', label: '考えている', detail: `${tool} 完了`, tool };
   if (ev === 'Notification')
     return { activity: 'waiting', label: '承認待ち', detail: String(h.message || '').slice(0, 120) };
+  // SubagentStop は handler 側で稼働中の数を見てラベルを決める（ここでは扱わない）
   if (ev === 'Stop') return { activity: 'idle', label: '待機中', detail: '応答を完了しました' };
   if (ev === 'SessionEnd') return { activity: 'ended', label: '終了', detail: '' };
   return { activity: 'thinking', label: ev, detail: '' };
 }
 
-function ingest(source, sessionId, cwd, classified, host) {
+// トランスクリプト(JSONL)から使用トークンを読む。
+// ctx = 直近assistant応答のコンテキスト量(input+cache), out = 出力トークン累計。
+// ファイル全読み込みなので session ごとに 2 秒スロットルする。
+const usageCache = new Map(); // sessionId -> { ts, tokens }
+function readUsage(sessionId, transcriptPath) {
+  if (!transcriptPath) return null;
+  const cached = usageCache.get(sessionId);
+  if (cached && Date.now() - cached.ts < 2000) return cached.tokens;
+  let tokens = cached ? cached.tokens : null;
+  try {
+    const lines = fs.readFileSync(transcriptPath, 'utf8').split('\n');
+    let ctx = 0, out = 0, found = false;
+    for (const line of lines) {
+      if (!line.includes('"usage"')) continue;
+      let u;
+      try { u = JSON.parse(line)?.message?.usage; } catch { continue; }
+      if (!u) continue;
+      out += u.output_tokens || 0;
+      ctx = (u.input_tokens || 0) + (u.cache_creation_input_tokens || 0) + (u.cache_read_input_tokens || 0);
+      found = true;
+    }
+    if (found) tokens = { ctx, out, ctxMax: CONTEXT_WINDOW };
+  } catch { /* リモート等でファイルが無ければ前回値を保持 */ }
+  usageCache.set(sessionId, { ts: Date.now(), tokens });
+  return tokens;
+}
+
+// セッションごとのサブエージェント追跡
+const subagentsBySession = new Map(); // sessionId -> [{type, desc, status, ts}]
+function trackSubagents(h) {
+  const sid = h.session_id || 'unknown';
+  const ev = h.hook_event_name;
+  const tool = h.tool_name || '';
+  let list = subagentsBySession.get(sid) || [];
+  if (ev === 'PreToolUse' && (tool === 'Agent' || tool === 'Task')) {
+    list.push({
+      type: h.tool_input?.subagent_type || 'agent',
+      desc: h.tool_input?.description || '',
+      status: 'running',
+      ts: Date.now(),
+    });
+    if (list.length > 16) list = list.slice(-16); // 直近16体まで保持
+  } else if (ev === 'SubagentStop' || (ev === 'PostToolUse' && (tool === 'Agent' || tool === 'Task'))) {
+    // 稼働中で最も古いものを完了扱い（個体識別ができないため FIFO）
+    const running = list.find((s) => s.status === 'running');
+    if (running) running.status = 'done';
+  } else if (ev === 'SessionEnd' || ev === 'SessionStart') {
+    list = [];
+  }
+  subagentsBySession.set(sid, list);
+  return list;
+}
+
+function ingest(source, sessionId, cwd, classified, host, tokens, subagents) {
   const now = Date.now();
   const event = {
     ts: now,
@@ -105,6 +160,8 @@ function ingest(source, sessionId, cwd, classified, host) {
     started_at: prev ? prev.started_at : now,
     updated_at: now,
     event_count: (prev ? prev.event_count : 0) + 1,
+    tokens: tokens || (prev ? prev.tokens : null),
+    subagents: subagents || (prev ? prev.subagents : []),
   };
   sessions.set(sessionId, session);
 
@@ -131,7 +188,24 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'POST' && url.pathname === '/ingest/claude') {
     try {
       const h = JSON.parse(await readBody(req));
-      ingest('claude', h.session_id || 'unknown', h.cwd, classifyClaude(h), req.headers['x-agent-host']);
+      const tokens = readUsage(h.session_id || 'unknown', h.transcript_path);
+      const subs = trackSubagents(h);
+      let classified = classifyClaude(h);
+      // SubagentStop: 稼働中が残っていれば「作業中（残りN）」、無ければ主エージェント継続とみなす
+      if (h.hook_event_name === 'SubagentStop') {
+        const running = subs.filter((x) => x.status === 'running').length;
+        classified = running > 0
+          ? { activity: 'delegating', label: `サブエージェント作業中（残り${running}）`, detail: '' }
+          : { activity: 'thinking', label: '考えている', detail: '' };
+      }
+      // 待機中(idle)は「考えている」で上書きしない。Stop 後に PostToolUse/SubagentStop の
+      // 余波イベントが遅れて来ても待機状態を維持する。新ターン(UserPromptSubmit)なら遷移する。
+      const prev = sessions.get(h.session_id || 'unknown');
+      if (prev && prev.activity === 'idle' && classified.activity === 'thinking' &&
+          h.hook_event_name !== 'UserPromptSubmit') {
+        classified = { activity: 'idle', label: '待機中', detail: prev.detail || '' };
+      }
+      ingest('claude', h.session_id || 'unknown', h.cwd, classified, req.headers['x-agent-host'], tokens, subs);
       res.writeHead(200).end('ok');
     } catch (e) {
       res.writeHead(400).end('bad json');
@@ -148,7 +222,7 @@ const server = http.createServer(async (req, res) => {
         label: h.label || h.activity || '',
         detail: h.detail || '',
         tool: h.tool || '',
-      }, h.host || req.headers['x-agent-host']);
+      }, h.host || req.headers['x-agent-host'], h.tokens || null, h.subagents || null);
       res.writeHead(200).end('ok');
     } catch (e) {
       res.writeHead(400).end('bad json');

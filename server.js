@@ -160,19 +160,30 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === 'POST' && url.pathname === '/clear-session') {
+    try {
+      const { session_id } = JSON.parse(await readBody(req));
+      sessions.delete(session_id);
+      broadcast({ type: 'remove_session', session_id });
+      res.writeHead(200).end('ok');
+    } catch (e) {
+      res.writeHead(400).end('bad json');
+    }
+    return;
+  }
+
   if (url.pathname === '/stream') {
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
       Connection: 'keep-alive',
     });
-    // 古い残骸を起動時に見せない: イベントは直近1時間、セッションは直近2時間のみ
+    // 古い残骸を起動時に見せない: 直近2時間に動きのあったセッションのみ
     const now = Date.now();
     res.write(
       `data: ${JSON.stringify({
         type: 'snapshot',
         sessions: [...sessions.values()].filter((s) => now - s.updated_at < 2 * 3600e3),
-        events: events.slice(-100).filter((e) => now - e.ts < 3600e3),
       })}\n\n`
     );
     clients.add(res);

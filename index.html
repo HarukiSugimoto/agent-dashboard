@@ -3,19 +3,45 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AGENT OPS — エージェント監視室</title>
+<title>AGENT OPS</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Zen+Maru+Gothic:wght@500;700&family=IBM+Plex+Mono:wght@400;600&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap" rel="stylesheet">
 <style>
-  :root {
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  button { font: inherit; cursor: pointer; }
+
+  /* ================= テーマ変数 ================= */
+  body[data-theme="clay"] {
+    --bg: #f6efe3;
+    --text: #5b4a3a;
+    --dim: #a08d78;
+    --card-hi: #fffdf8;
+    --card-lo: #f1e7d8;
+    --sh-dark: rgba(180, 155, 120, .38);
+    --sh-light: rgba(255, 255, 255, .95);
+
+    --c-coding:     #58c98d;
+    --c-reading:    #5cb8ec;
+    --c-searching:  #b18ae8;
+    --c-running:    #f0a05e;
+    --c-delegating: #ef8ab5;
+    --c-planning:   #e5c04e;
+    --c-thinking:   #9aa6c4;
+    --c-waiting:    #ee7d7d;
+    --c-idle:       #bfae97;
+    --c-ended:      #c4bcb0;
+
+    font-family: "Zen Maru Gothic", "Baloo 2", sans-serif;
+  }
+  body[data-theme="ops"] {
     --bg: #07090b;
-    --panel: #0d1114;
-    --panel-2: #10161b;
-    --line: #1c242c;
     --text: #d7dee5;
     --dim: #5c6a76;
-    --faint: #38434d;
+    --card-hi: #131a20;
+    --card-lo: #0c1014;
+    --sh-dark: rgba(0, 0, 0, .6);
+    --sh-light: rgba(255, 255, 255, .04);
 
     --c-coding:     #3dd68c;
     --c-reading:    #4cc3ff;
@@ -28,297 +54,278 @@
     --c-idle:       #45525e;
     --c-ended:      #2c353e;
 
-    font-size: 15px;
-  }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-
-  body {
-    background: var(--bg);
-    color: var(--text);
     font-family: "Zen Kaku Gothic New", sans-serif;
-    min-height: 100vh;
-    overflow-x: hidden;
   }
-  /* CRT scanlines + vignette */
-  body::before {
+
+  body { background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden; transition: background .4s; }
+
+  /* ================= 背景 ================= */
+  /* clay: ゆらゆら浮かぶパステルの雲ブロブ */
+  #blobs { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
+  #blobs i { position: absolute; border-radius: 50%; filter: blur(60px); opacity: .5; animation: drift 16s ease-in-out infinite alternate; }
+  #blobs i:nth-child(1) { width: 420px; height: 420px; background: #ffd9e8; top: -120px; left: -80px; }
+  #blobs i:nth-child(2) { width: 380px; height: 380px; background: #d3ecff; bottom: -100px; right: -60px; animation-delay: -5s; }
+  #blobs i:nth-child(3) { width: 300px; height: 300px; background: #e2ffd9; top: 40%; left: 55%; animation-delay: -10s; }
+  @keyframes drift { to { transform: translate(50px, 30px) scale(1.12); } }
+  body[data-theme="ops"] #blobs { display: none; }
+  /* ops: CRT スキャンライン */
+  body[data-theme="ops"]::before {
     content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 99;
     background:
       repeating-linear-gradient(0deg, transparent 0 2px, rgba(0,0,0,.13) 2px 4px),
       radial-gradient(ellipse at 50% 40%, transparent 55%, rgba(0,0,0,.5) 100%);
   }
-  .mono { font-family: "IBM Plex Mono", monospace; }
 
-  /* ---------- header ---------- */
-  header {
-    display: flex; align-items: baseline; gap: 1.2rem;
-    padding: 1.1rem 1.6rem .9rem;
-    border-bottom: 1px solid var(--line);
-    background: linear-gradient(180deg, #0c1116, var(--bg));
-  }
-  header h1 {
-    font-family: "IBM Plex Mono", monospace;
-    font-size: 1.05rem; font-weight: 600; letter-spacing: .35em;
-    color: var(--c-coding);
-    text-shadow: 0 0 12px rgba(61,214,140,.45);
-  }
-  header .sub { font-size: .78rem; color: var(--dim); letter-spacing: .2em; }
-  header .right { margin-left: auto; display: flex; gap: 1.4rem; align-items: baseline; }
-  #clock { font-family: "IBM Plex Mono", monospace; font-size: .95rem; color: var(--text); }
-  #conn { font-family: "IBM Plex Mono", monospace; font-size: .72rem; letter-spacing: .15em; }
-  #conn.on  { color: var(--c-coding); }
-  #conn.off { color: var(--c-waiting); animation: blink 1s steps(2) infinite; }
-  @keyframes blink { 50% { opacity: .25; } }
-  #clear {
-    font-family: "IBM Plex Mono", monospace; font-size: .62rem; letter-spacing: .18em;
-    background: none; border: 1px solid var(--faint); border-radius: 3px;
-    color: var(--dim); padding: .2rem .55rem; cursor: pointer;
-    transition: color .2s, border-color .2s;
-  }
-  #clear:hover { color: var(--c-waiting); border-color: var(--c-waiting); }
+  /* ================= ヘッダー ================= */
+  header { position: relative; z-index: 2; display: flex; align-items: center; gap: 1rem; padding: 1.2rem 1.8rem .9rem; }
+  h1 { font-size: 1.25rem; font-weight: 800; letter-spacing: .06em; }
+  body[data-theme="clay"] h1 { font-family: "Baloo 2", "Zen Maru Gothic", sans-serif; color: #6b5642; text-shadow: 0 2px 0 #fff; }
+  body[data-theme="ops"] h1 { font-family: "IBM Plex Mono", monospace; font-size: 1rem; letter-spacing: .35em; color: var(--c-coding); text-shadow: 0 0 12px rgba(61,214,140,.45); }
+  header .right { margin-left: auto; display: flex; gap: .7rem; align-items: center; }
+  #clock { font-family: "IBM Plex Mono", monospace; font-size: .9rem; color: var(--dim); }
+  #conn { font-size: .7rem; }
+  #conn.on { color: var(--c-coding); } #conn.off { color: var(--c-waiting); animation: blink 1s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: .2; } }
 
-  /* ---------- layout ---------- */
-  .wrap {
-    display: grid; grid-template-columns: 1fr 340px; gap: 0;
-    min-height: calc(100vh - 58px);
-  }
-  @media (max-width: 900px) { .wrap { grid-template-columns: 1fr; } }
+  .hbtn { border: none; font-weight: 700; font-size: .74rem; padding: .45rem .9rem; border-radius: 999px; color: var(--dim); background: var(--card-hi); transition: transform .15s, color .2s; }
+  body[data-theme="clay"] .hbtn { box-shadow: 3px 3px 8px var(--sh-dark), -3px -3px 8px var(--sh-light); }
+  body[data-theme="ops"]  .hbtn { background: none; border: 1px solid #38434d; border-radius: 4px; font-family: "IBM Plex Mono", monospace; letter-spacing: .1em; }
+  .hbtn:hover { color: var(--c-waiting); transform: translateY(-1px); }
+  .hbtn:active { transform: scale(.94); }
 
-  /* ---------- session grid ---------- */
-  #grid {
-    padding: 1.4rem 1.6rem;
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
-    gap: 1rem; align-content: start;
-  }
-  #empty {
-    grid-column: 1 / -1; padding: 4rem 1rem; text-align: center;
-    color: var(--faint); font-size: .85rem; letter-spacing: .1em;
-  }
-  #empty .big { font-family: "IBM Plex Mono", monospace; font-size: 1.1rem; margin-bottom: .8rem; color: var(--dim); }
+  /* ================= カードグリッド ================= */
+  #grid { position: relative; z-index: 1; padding: 1.2rem 1.8rem 2.4rem; display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1.3rem; align-content: start; }
+  #empty { grid-column: 1 / -1; padding: 5rem 1rem; text-align: center; color: var(--dim); font-size: .95rem; }
+  #empty .zzz { font-size: 3rem; display: block; margin-bottom: 1rem; animation: boing 3s ease-in-out infinite; }
 
   .card {
     --c: var(--c-thinking);
-    background: linear-gradient(160deg, var(--panel-2), var(--panel));
-    border: 1px solid var(--line);
-    border-left: 3px solid var(--c);
-    border-radius: 6px;
-    padding: .95rem 1.05rem .85rem;
     position: relative;
-    animation: reveal .45s cubic-bezier(.2,.9,.3,1) backwards;
-    transition: border-color .4s, box-shadow .4s, opacity .4s;
-    box-shadow: 0 0 0 rgba(0,0,0,0);
+    display: flex; gap: 1rem; align-items: center;
+    padding: 1.15rem 1.2rem;
+    border-radius: 26px;
+    background: linear-gradient(145deg, var(--card-hi), var(--card-lo));
+    animation: appear .5s cubic-bezier(.34, 1.56, .64, 1) backwards;
+    transition: transform .25s, opacity .4s, box-shadow .3s;
   }
-  .card.active { box-shadow: -6px 0 24px -12px var(--c); }
-  .card.gone { opacity: .35; }
-  @keyframes reveal { from { opacity: 0; transform: translateY(10px); } }
+  body[data-theme="clay"] .card {
+    box-shadow:
+      9px 9px 22px var(--sh-dark),
+      -7px -7px 18px var(--sh-light),
+      inset 2px 2px 6px rgba(255,255,255,.85),
+      inset -3px -3px 8px rgba(185,160,125,.18);
+  }
+  body[data-theme="ops"] .card { border-radius: 8px; border: 1px solid #1c242c; border-left: 3px solid var(--c); }
+  body[data-theme="ops"] .card.active { box-shadow: -6px 0 24px -12px var(--c); }
+  .card:hover { transform: translateY(-5px) rotate(-.4deg); }
+  .card.gone { opacity: .4; }
+  .card.pop { animation: pop .3s cubic-bezier(.34, 1.56, .64, 1); }
+  @keyframes appear { from { opacity: 0; transform: scale(.8) translateY(16px); } }
+  @keyframes pop { 50% { transform: scale(1.035); } }
 
-  .card .top { display: flex; align-items: center; gap: .6rem; margin-bottom: .65rem; }
-  .badge {
-    font-family: "IBM Plex Mono", monospace; font-size: .62rem; font-weight: 600;
-    letter-spacing: .18em; padding: .18rem .45rem; border-radius: 3px;
-    border: 1px solid var(--faint); color: var(--dim);
+  /* --- ぷにぷにアバター --- */
+  .avatar {
+    width: 74px; height: 74px; flex-shrink: 0;
+    border-radius: 50%;
+    display: grid; place-items: center;
+    font-size: 2.1rem;
+    background: radial-gradient(circle at 32% 28%, #ffffff 0%, var(--c) 78%);
   }
-  .badge.claude { border-color: #b0703a; color: #e0904f; }
-  .badge.codex  { border-color: #4a7a9c; color: #6fb3dd; }
-  .card .proj { font-weight: 700; font-size: .95rem; letter-spacing: .03em; }
-  .card .sid {
-    margin-left: auto; font-family: "IBM Plex Mono", monospace;
-    font-size: .65rem; color: var(--faint);
+  body[data-theme="clay"] .avatar {
+    box-shadow:
+      5px 6px 12px var(--sh-dark),
+      inset 3px 4px 6px rgba(255,255,255,.75),
+      inset -4px -5px 10px rgba(0,0,0,.14);
+  }
+  body[data-theme="ops"] .avatar { background: radial-gradient(circle at 32% 28%, #202a33 0%, #0c1014 80%); border: 2px solid var(--c); box-shadow: 0 0 14px -4px var(--c); font-size: 1.9rem; }
+  .card.active .avatar { animation: boing 1.7s ease-in-out infinite; }
+  @keyframes boing {
+    0%, 100% { transform: translateY(0) scale(1, 1); }
+    30%      { transform: translateY(-7px) scale(.96, 1.06); }
+    50%      { transform: translateY(0) scale(1.05, .94); }
+    65%      { transform: translateY(-2px) scale(.99, 1.02); }
   }
 
-  .card .act { display: flex; align-items: center; gap: .55rem; }
-  .dot {
-    width: 9px; height: 9px; border-radius: 50%;
-    background: var(--c); box-shadow: 0 0 8px var(--c);
-    flex-shrink: 0;
-  }
-  .card.active .dot { animation: pulse 1.2s ease-in-out infinite; }
-  @keyframes pulse { 50% { transform: scale(1.6); opacity: .55; } }
-  .act .label { font-size: 1.12rem; font-weight: 700; color: var(--c); letter-spacing: .02em; }
+  .info { min-width: 0; flex: 1; }
+  .proj { font-weight: 700; font-size: 1.02rem; margin-bottom: .1rem; }
+  .label { font-weight: 700; font-size: .88rem; color: var(--c); filter: brightness(.92); }
+  body[data-theme="ops"] .label { filter: none; }
+  .detail { font-family: "IBM Plex Mono", monospace; font-size: .66rem; color: var(--dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: .25rem; min-height: 1em; }
+  .meta { display: flex; gap: .9rem; font-size: .66rem; color: var(--dim); margin-top: .4rem; font-family: "IBM Plex Mono", monospace; }
 
-  .card .detail {
-    margin: .5rem 0 .7rem; font-family: "IBM Plex Mono", monospace;
-    font-size: .72rem; color: var(--dim);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    min-height: 1.1em;
+  /* --- 個別クリア --- */
+  .x {
+    position: absolute; top: .7rem; right: .8rem;
+    width: 26px; height: 26px; border-radius: 50%; border: none;
+    font-size: .8rem; font-weight: 700; line-height: 1;
+    color: var(--dim); background: var(--card-lo);
+    opacity: 0; transition: opacity .2s, transform .15s, color .2s;
   }
-  .card .meta {
-    display: flex; gap: 1.1rem;
-    font-family: "IBM Plex Mono", monospace; font-size: .68rem; color: var(--faint);
-    border-top: 1px solid var(--line); padding-top: .55rem;
-  }
-  .card .meta .elapsed { color: var(--dim); }
+  body[data-theme="clay"] .x { box-shadow: 2px 2px 5px var(--sh-dark), -2px -2px 5px var(--sh-light); }
+  .card:hover .x { opacity: 1; }
+  .x:hover { color: var(--c-waiting); transform: scale(1.15); }
+  .x:active { transform: scale(.9); }
 
-  /* ---------- live feed ---------- */
-  #feedWrap {
-    border-left: 1px solid var(--line);
-    background: var(--panel);
-    display: flex; flex-direction: column;
-    max-height: calc(100vh - 58px); position: sticky; top: 0;
+  /* ================= テーマ選択 ================= */
+  #picker {
+    position: fixed; inset: 0; z-index: 200;
+    display: flex; gap: 2rem; align-items: center; justify-content: center;
+    background: rgba(30, 24, 16, .45); backdrop-filter: blur(8px);
   }
-  #feedWrap h2 {
-    font-family: "IBM Plex Mono", monospace; font-size: .7rem; font-weight: 600;
-    letter-spacing: .3em; color: var(--dim);
-    padding: .9rem 1.1rem .7rem; border-bottom: 1px solid var(--line);
+  #picker[hidden] { display: none; }
+  .pick {
+    width: 240px; padding: 2rem 1.6rem; text-align: center;
+    border-radius: 30px; border: none;
+    font-weight: 700; font-size: 1.05rem;
+    transition: transform .2s;
+    animation: appear .5s cubic-bezier(.34,1.56,.64,1) backwards;
   }
-  #feed { overflow-y: auto; padding: .4rem 0; flex: 1; }
-  #feed::-webkit-scrollbar { width: 4px; }
-  #feed::-webkit-scrollbar-thumb { background: var(--faint); }
-  .row {
-    display: grid; grid-template-columns: 52px 10px 1fr; gap: .5rem;
-    padding: .32rem 1.1rem; font-size: .72rem; align-items: baseline;
-    animation: reveal .3s backwards;
+  .pick:hover { transform: translateY(-6px) scale(1.03); }
+  .pick .icon { font-size: 3rem; display: block; margin-bottom: .8rem; }
+  .pick small { display: block; font-weight: 500; font-size: .72rem; margin-top: .5rem; opacity: .75; }
+  .pick[data-t="clay"] {
+    font-family: "Zen Maru Gothic", sans-serif; color: #5b4a3a;
+    background: linear-gradient(145deg, #fffdf8, #f1e7d8);
+    box-shadow: 10px 10px 26px rgba(120,95,60,.45), -6px -6px 16px rgba(255,255,255,.6);
   }
-  .row .t  { font-family: "IBM Plex Mono", monospace; color: var(--faint); font-size: .66rem; }
-  .row .m  { width: 7px; height: 7px; border-radius: 50%; background: var(--c, var(--dim)); align-self: center; }
-  .row .b .l { color: var(--text); }
-  .row .b .d {
-    font-family: "IBM Plex Mono", monospace; color: var(--faint); font-size: .64rem;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block;
+  .pick[data-t="ops"] {
+    font-family: "IBM Plex Mono", monospace; color: #3dd68c; letter-spacing: .1em;
+    background: linear-gradient(160deg, #10161b, #0a0e11);
+    border: 1px solid #1c242c; border-radius: 10px;
+    text-shadow: 0 0 10px rgba(61,214,140,.5);
+    animation-delay: .08s;
   }
-  .row .b .p { color: var(--dim); font-size: .64rem; margin-right: .4em; }
+  .pick[data-t="ops"] small { color: #5c6a76; text-shadow: none; }
 </style>
 </head>
-<body>
+<body data-theme="clay">
+
+<div id="blobs"><i></i><i></i><i></i></div>
 
 <header>
-  <h1>AGENT OPS</h1>
-  <span class="sub">エージェント監視室 / PHASE 1</span>
+  <h1 id="logo">エージェントみまもり隊</h1>
   <div class="right">
-    <button id="clear" title="表示とサーバー上の履歴をクリア">CLEAR</button>
-    <span id="conn" class="off">● CONNECTING</span>
-    <span id="clock" class="mono">--:--:--</span>
+    <button id="themeBtn" class="hbtn">テーマ</button>
+    <button id="clearAll" class="hbtn">ぜんぶクリア</button>
+    <span id="conn" class="off">●</span>
+    <span id="clock">--:--:--</span>
   </div>
 </header>
 
-<div class="wrap">
-  <main id="grid">
-    <div id="empty">
-      <div class="big">NO ACTIVE SESSIONS</div>
-      新しい Claude Code セッションを開始すると、ここにカードが現れます
-    </div>
-  </main>
-  <aside id="feedWrap">
-    <h2>LIVE FEED</h2>
-    <div id="feed"></div>
-  </aside>
+<main id="grid">
+  <div id="empty">
+    <span class="zzz">💤</span>
+    まだ誰もいないよ。新しいセッションを始めるとここに現れます
+  </div>
+</main>
+
+<div id="picker" hidden>
+  <button class="pick" data-t="clay"><span class="icon">🧸</span>クレイ<small>やわらか3D・パステル</small></button>
+  <button class="pick" data-t="ops"><span class="icon">🖥️</span>管制室<small>ダークCRT・モノスペース</small></button>
 </div>
 
 <script>
-const COLORS = {
-  coding: 'var(--c-coding)', reading: 'var(--c-reading)', searching: 'var(--c-searching)',
-  running: 'var(--c-running)', delegating: 'var(--c-delegating)', planning: 'var(--c-planning)',
-  thinking: 'var(--c-thinking)', waiting: 'var(--c-waiting)', idle: 'var(--c-idle)', ended: 'var(--c-ended)',
+const COLORS = ['coding','reading','searching','running','delegating','planning','thinking','waiting','idle','ended'];
+const EMOJI = {
+  coding: '⌨️', reading: '📖', searching: '🔍', running: '⚙️', delegating: '🤝',
+  planning: '📝', thinking: '💭', waiting: '🙋', idle: '😴', ended: '👋',
 };
 const ACTIVE = new Set(['coding','reading','searching','running','delegating','planning','thinking']);
 const sessions = new Map();
 const grid = document.getElementById('grid');
-const feed = document.getElementById('feed');
 const empty = document.getElementById('empty');
 
-function fmtTime(ts) {
-  return new Date(ts).toTimeString().slice(0, 8);
-}
+function fmtTime(ts) { return new Date(ts).toTimeString().slice(0, 8); }
 function fmtElapsed(ms) {
   const s = Math.floor(ms / 1000);
-  if (s < 60) return s + 's';
-  if (s < 3600) return Math.floor(s / 60) + 'm' + (s % 60) + 's';
-  return Math.floor(s / 3600) + 'h' + Math.floor((s % 3600) / 60) + 'm';
+  if (s < 60) return s + '秒';
+  if (s < 3600) return Math.floor(s / 60) + '分';
+  return Math.floor(s / 3600) + '時間' + Math.floor((s % 3600) / 60) + '分';
 }
 
 function renderSession(s) {
   let el = document.getElementById('s-' + s.session_id);
-  if (!el) {
+  const fresh = !el;
+  if (fresh) {
     el = document.createElement('div');
     el.id = 's-' + s.session_id;
     el.className = 'card';
     el.innerHTML = `
-      <div class="top">
-        <span class="badge"></span>
-        <span class="proj"></span>
-        <span class="sid"></span>
-      </div>
-      <div class="act"><span class="dot"></span><span class="label"></span></div>
-      <div class="detail"></div>
-      <div class="meta">
-        <span class="elapsed"></span>
-        <span class="count"></span>
+      <button class="x" title="このカードを消す">✕</button>
+      <div class="avatar"><span class="emoji"></span></div>
+      <div class="info">
+        <div class="proj"></div>
+        <div class="label"></div>
+        <div class="detail"></div>
+        <div class="meta"><span class="elapsed"></span><span class="sid"></span></div>
       </div>`;
-    grid.prepend(el);
+    el.querySelector('.x').onclick = () =>
+      fetch('/clear-session', { method: 'POST', body: JSON.stringify({ session_id: s.session_id }) });
   }
-  el.style.setProperty('--c', COLORS[s.activity] || 'var(--c-thinking)');
+  el.style.setProperty('--c', `var(--c-${COLORS.includes(s.activity) ? s.activity : 'thinking'})`);
   el.classList.toggle('active', ACTIVE.has(s.activity));
   el.classList.toggle('gone', s.activity === 'ended');
-  el.querySelector('.badge').textContent = s.source.toUpperCase();
-  el.querySelector('.badge').className = 'badge ' + s.source;
+  el.querySelector('.emoji').textContent = EMOJI[s.activity] || '💭';
   el.querySelector('.proj').textContent = s.project;
-  el.querySelector('.sid').textContent =
-    (s.host ? s.host + ' · ' : '') + s.session_id.slice(0, 8);
   el.querySelector('.label').textContent = s.label;
   el.querySelector('.detail').textContent = s.detail || '';
-  el.querySelector('.count').textContent = s.event_count + ' events';
+  el.querySelector('.sid').textContent = (s.host ? s.host + ' · ' : '') + s.session_id.slice(0, 8);
   el.dataset.updated = s.updated_at;
-  empty.style.display = sessions.size ? 'none' : '';
   grid.prepend(el); // 最新更新を先頭へ
+  if (!fresh) { el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); }
+  empty.style.display = sessions.size ? 'none' : '';
 }
 
-function renderEvent(e) {
-  const row = document.createElement('div');
-  row.className = 'row';
-  row.style.setProperty('--c', COLORS[e.activity] || 'var(--dim)');
-  const proj = (e.host ? e.host + ':' : '') + (e.cwd ? e.cwd.split('/').pop() : '');
-  row.innerHTML = `
-    <span class="t">${fmtTime(e.ts)}</span>
-    <span class="m"></span>
-    <span class="b">
-      <span class="p">${proj}</span><span class="l">${e.label}</span>
-      <span class="d">${(e.detail || '').replace(/</g, '&lt;')}</span>
-    </span>`;
-  feed.prepend(row);
-  while (feed.children.length > 120) feed.lastChild.remove();
+function removeSession(id) {
+  sessions.delete(id);
+  document.getElementById('s-' + id)?.remove();
+  empty.style.display = sessions.size ? 'none' : '';
 }
 
 function apply(s) { sessions.set(s.session_id, s); renderSession(s); }
 
-// 画面を空にする（再接続時のスナップショット反映前と CLEAR 時に使う）
 function resetUI() {
   sessions.clear();
   grid.querySelectorAll('.card').forEach((el) => el.remove());
-  feed.innerHTML = '';
   empty.style.display = '';
 }
 
-document.getElementById('clear').onclick = () => fetch('/clear', { method: 'POST' });
+document.getElementById('clearAll').onclick = () => fetch('/clear', { method: 'POST' });
+
+// --- テーマ ---
+const picker = document.getElementById('picker');
+const logo = document.getElementById('logo');
+function setTheme(t) {
+  document.body.dataset.theme = t;
+  logo.textContent = t === 'ops' ? 'AGENT OPS' : 'エージェントみまもり隊';
+  localStorage.setItem('agentops-theme', t);
+  picker.hidden = true;
+}
+document.querySelectorAll('.pick').forEach((b) => (b.onclick = () => setTheme(b.dataset.t)));
+document.getElementById('themeBtn').onclick = () => (picker.hidden = false);
+const saved = localStorage.getItem('agentops-theme');
+if (saved) setTheme(saved); else picker.hidden = false; // 初回起動はタイプ選択から
 
 // --- SSE ---
 const conn = document.getElementById('conn');
-function connect() {
-  const es = new EventSource('/stream');
-  es.onopen = () => { conn.textContent = '● LIVE'; conn.className = 'on'; };
-  es.onerror = () => { conn.textContent = '● OFFLINE'; conn.className = 'off'; };
-  es.onmessage = (m) => {
-    const msg = JSON.parse(m.data);
-    if (msg.type === 'snapshot') {
-      resetUI();
-      msg.sessions.forEach(apply);
-      msg.events.forEach(renderEvent);
-    } else if (msg.type === 'update') {
-      apply(msg.session);
-      renderEvent(msg.event);
-    } else if (msg.type === 'clear') {
-      resetUI();
-    }
-  };
-}
-connect();
+const es = new EventSource('/stream');
+es.onopen = () => { conn.className = 'on'; };
+es.onerror = () => { conn.className = 'off'; };
+es.onmessage = (m) => {
+  const msg = JSON.parse(m.data);
+  if (msg.type === 'snapshot') { resetUI(); msg.sessions.forEach(apply); }
+  else if (msg.type === 'update') apply(msg.session);
+  else if (msg.type === 'clear') resetUI();
+  else if (msg.type === 'remove_session') removeSession(msg.session_id);
+};
 
-// --- timers ---
+// --- 時計と経過時間 ---
 setInterval(() => {
   document.getElementById('clock').textContent = fmtTime(Date.now());
   for (const s of sessions.values()) {
     const el = document.getElementById('s-' + s.session_id);
     if (!el) continue;
-    el.querySelector('.elapsed').textContent = fmtElapsed(Date.now() - s.updated_at) + ' 前';
-    // 20分イベントなし → 消えたとみなして暗く
+    el.querySelector('.elapsed').textContent = fmtElapsed(Date.now() - s.updated_at) + 'まえ';
     if (Date.now() - s.updated_at > 20 * 60 * 1000) el.classList.add('gone');
   }
 }, 1000);

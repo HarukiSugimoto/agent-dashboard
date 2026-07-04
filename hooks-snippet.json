@@ -1,0 +1,22 @@
+{
+  "hooks": {
+    "SessionStart": [
+      { "hooks": [{ "type": "command", "command": "\"$HOME/Desktop/個人開発/agent-dashboard/hooks/claude-hook.sh\"" }] }
+    ],
+    "UserPromptSubmit": [
+      { "hooks": [{ "type": "command", "command": "\"$HOME/Desktop/個人開発/agent-dashboard/hooks/claude-hook.sh\"" }] }
+    ],
+    "PreToolUse": [
+      { "matcher": "*", "hooks": [{ "type": "command", "command": "\"$HOME/Desktop/個人開発/agent-dashboard/hooks/claude-hook.sh\"" }] }
+    ],
+    "PostToolUse": [
+      { "matcher": "*", "hooks": [{ "type": "command", "command": "\"$HOME/Desktop/個人開発/agent-dashboard/hooks/claude-hook.sh\"" }] }
+    ],
+    "Stop": [
+      { "hooks": [{ "type": "command", "command": "\"$HOME/Desktop/個人開発/agent-dashboard/hooks/claude-hook.sh\"" }] }
+    ],
+    "SessionEnd": [
+      { "hooks": [{ "type": "command", "command": "\"$HOME/Desktop/個人開発/agent-dashboard/hooks/claude-hook.sh\"" }] }
+    ]
+  }
+}

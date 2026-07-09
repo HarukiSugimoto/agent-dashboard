@@ -1,8 +1,49 @@
 import Cocoa
 import WebKit
+import UserNotifications
 
 // AGENT OPS — ダッシュボード用の最小 WebView ラッパーアプリ。
 // 起動時にコレクタ (server.js) を自動起動し、http://127.0.0.1:4820 を表示する。
+
+// --notify モード: GUI を立てずに通知センターへ通知を出して即終了する。
+// server.js がセッションの「待ち」遷移時に
+//   AgentOps.app/Contents/MacOS/AgentOps --notify <title> <subtitle> <body>
+// として直接起動する。アプリバンドルの名義で送るため、通知には AppIcon が表示される
+// （osascript だと送り主がスクリプトエディタになりアイコンを変えられない）。
+if CommandLine.arguments.count >= 3, CommandLine.arguments[1] == "--notify" {
+    let args = CommandLine.arguments
+    // 要コード署名: ad-hoc 署名では許可ダイアログが出ずに拒否される
+    // （build.sh が「AgentOps Signing」証明書で署名する）。
+    let center = UNUserNotificationCenter.current()
+    center.requestAuthorization(options: [.alert, .sound]) { granted, err in
+        if !granted {
+            // Apple発行でない証明書だと UserNotifications は拒否される。
+            // その場合は旧 API (NSUserNotification, deprecated) で送る。
+            FileHandle.standardError.write(Data("notify: UserNotifications 拒否、旧APIで送信 \(err.map { String(describing: $0) } ?? "")\n".utf8))
+            let n = NSUserNotification()
+            n.title = args[2]
+            if args.count > 3, !args[3].isEmpty { n.subtitle = args[3] }
+            if args.count > 4, !args[4].isEmpty { n.informativeText = args[4] }
+            n.soundName = "Glass"
+            NSUserNotificationCenter.default.deliver(n)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { exit(0) }
+            return
+        }
+        let content = UNMutableNotificationContent()
+        content.title = args[2]
+        if args.count > 3, !args[3].isEmpty { content.subtitle = args[3] }
+        if args.count > 4, !args[4].isEmpty { content.body = args[4] }
+        content.sound = UNNotificationSound(named: UNNotificationSoundName("Glass"))
+        let req = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
+        center.add(req) { _ in
+            // 配送完了前にプロセスが死なないよう一拍置いて終了
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { exit(0) }
+        }
+    }
+    // 初回は許可ダイアログへの応答を待つ可能性があるため長めに待つ
+    RunLoop.main.run(until: Date(timeIntervalSinceNow: 30))
+    exit(0)
+}
 
 let DASHBOARD_URL = URL(string: "http://127.0.0.1:4820/")!
 
@@ -12,6 +53,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         startCollectorIfNeeded()
+
+        // 通知権限を確保する（server.js が --notify モードで通知を送るのに必要）。
+        // 初回起動時のみ許可ダイアログが表示される。
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
 
         let rect = NSRect(x: 0, y: 0, width: 1200, height: 780)
         window = NSWindow(

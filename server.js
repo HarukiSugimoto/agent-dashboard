@@ -7,7 +7,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { exec } = require('child_process');
+const { exec, execFile } = require('child_process');
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 4820;
 // デフォルトはループバックのみ。Tailscale/LAN 経由で直接受けるなら BIND=0.0.0.0
@@ -72,8 +72,14 @@ function classifyClaude(h) {
   }
   if (ev === 'PostToolUse')
     return { activity: 'thinking', label: '考えている', detail: `${tool} 完了`, tool };
-  if (ev === 'Notification')
-    return { activity: 'waiting', label: '承認待ち', detail: String(h.message || '').slice(0, 120) };
+  if (ev === 'Notification') {
+    const msg = String(h.message || '');
+    // 60秒無操作の催促（Claude is waiting for your input）は手が止まっているわけでは
+    // ないので待機側に寄せる。ツール許可要求など、それ以外は承認待ちのまま。
+    if (/waiting for your input/i.test(msg))
+      return { activity: 'idle', label: '応答待ち', detail: msg.slice(0, 120) };
+    return { activity: 'waiting', label: '承認待ち', detail: msg.slice(0, 120) };
+  }
   // SubagentStop は handler 側で稼働中の数を見てラベルを決める（ここでは扱わない）
   if (ev === 'Stop') return { activity: 'idle', label: '待機中', detail: '応答を完了しました' };
   if (ev === 'SessionEnd') return { activity: 'ended', label: '終了', detail: '' };
@@ -133,6 +139,31 @@ function trackSubagents(h) {
   return list;
 }
 
+// macOS 通知: セッションが稼働中から「待ち」(承認待ち/応答待ち/待機中) に遷移したら
+// osascript で通知センターに出す。NOTIFY=0 で無効化。macOS 以外では何もしない。
+// 待ち→待ちの揺れや初回イベント（起動直後のスナップショット的な受信）では鳴らさない。
+const NOTIFY_ENABLED = process.platform === 'darwin' && process.env.NOTIFY !== '0';
+const WAIT_ACTIVITIES = new Set(['waiting', 'idle']);
+const APP_NOTIFIER = path.join(__dirname, 'AgentOps.app/Contents/MacOS/AgentOps');
+function notifyWaiting(prev, session) {
+  if (!NOTIFY_ENABLED) return;
+  if (!WAIT_ACTIVITIES.has(session.activity)) return;
+  if (!prev || WAIT_ACTIVITIES.has(prev.activity) || prev.activity === 'ended') return;
+  const title = `AGENT OPS — ${session.project}`;
+  const body = session.detail || session.label;
+  // アプリバンドルがあればアプリ名義で送る（AppIcon 付き）。無ければ osascript に
+  // フォールバック（送り主がスクリプトエディタになりアイコンは汎用）。
+  if (fs.existsSync(APP_NOTIFIER)) {
+    execFile(APP_NOTIFIER, ['--notify', title, session.label, body], () => {});
+    return;
+  }
+  const q = (s) => String(s || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  const script =
+    `display notification "${q(body)}" with title "${q(title)}"` +
+    ` subtitle "${q(session.label)}" sound name "Glass"`;
+  execFile('osascript', ['-e', script], () => {});
+}
+
 function ingest(source, sessionId, cwd, classified, host, tokens, subagents) {
   const now = Date.now();
   const event = {
@@ -146,13 +177,17 @@ function ingest(source, sessionId, cwd, classified, host, tokens, subagents) {
   events.push(event);
   if (events.length > MAX_EVENTS) events.shift();
 
-  const project = cwd ? path.basename(cwd) : '(不明)';
   const prev = sessions.get(sessionId);
+  // cwd はセッション最初の値（＝起動ディレクトリ）に固定する。
+  // Claude Code の hook は cd 後に移動先の cwd を送ってくるため、
+  // 毎回上書きすると表示名が実行ディレクトリに引きずられてしまう。
+  const baseCwd = (prev && prev.cwd) ? prev.cwd : (cwd || '');
+  const project = baseCwd ? path.basename(baseCwd) : '(不明)';
   const session = {
     session_id: sessionId,
     source,
     project,
-    cwd: cwd || '',
+    cwd: baseCwd,
     host: host || '',
     activity: event.activity,
     label: event.label,
@@ -164,6 +199,7 @@ function ingest(source, sessionId, cwd, classified, host, tokens, subagents) {
     subagents: subagents || (prev ? prev.subagents : []),
   };
   sessions.set(sessionId, session);
+  notifyWaiting(prev, session);
 
   fs.appendFile(LOG_PATH, JSON.stringify(event) + '\n', () => {});
   broadcast({ type: 'update', session, event });
@@ -203,7 +239,7 @@ const server = http.createServer(async (req, res) => {
       const prev = sessions.get(h.session_id || 'unknown');
       if (prev && prev.activity === 'idle' && classified.activity === 'thinking' &&
           h.hook_event_name !== 'UserPromptSubmit') {
-        classified = { activity: 'idle', label: '待機中', detail: prev.detail || '' };
+        classified = { activity: 'idle', label: prev.label || '待機中', detail: prev.detail || '' };
       }
       ingest('claude', h.session_id || 'unknown', h.cwd, classified, req.headers['x-agent-host'], tokens, subs);
       res.writeHead(200).end('ok');

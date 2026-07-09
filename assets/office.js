@@ -306,14 +306,32 @@ function deskSeat(id) {
   return idx;
 }
 
+// spot 内で重ならないよう、状態ごとに空き slot を割り当てる（deskSeat の平面版）。
+// hash%5 だと衝突するので、同じ activity で使用中の番号を避けて順番に配る。
+const slotOf = new Map(); // session_id -> { activity, idx }
+const SPREAD = [
+  [0, 0], [0.85, 0.35], [-0.85, 0.35], [0.45, -0.7], [-0.45, -0.7],
+  [1.25, -0.35], [-1.25, -0.35], [0.1, 0.95], [1.0, 1.05], [-1.0, 1.05],
+];
+function spotSlot(activity, id) {
+  const cur = slotOf.get(id);
+  if (cur && cur.activity === activity) return cur.idx;
+  const used = new Set();
+  for (const [sid, v] of slotOf) if (sid !== id && v.activity === activity) used.add(v.idx);
+  let idx = 0; while (used.has(idx)) idx++;
+  idx %= SPREAD.length;
+  slotOf.set(id, { activity, idx });
+  return idx;
+}
+
 function targetFor(s) {
-  if (s.activity === 'coding') { const d = DESKS[deskSeat(s.session_id)]; return { x: d.x, z: d.z }; }
-  if (s.activity === 'thinking') return null;
+  if (s.activity === 'coding') { slotOf.delete(s.session_id); const d = DESKS[deskSeat(s.session_id)]; return { x: d.x, z: d.z }; }
+  if (s.activity === 'thinking') { slotOf.delete(s.session_id); return null; }
   const base = SPOTS[s.activity];
   if (!base) return null;
   if (s.activity !== 'ended') seatOf.delete(s.session_id);
-  const j = (hash(s.session_id) % 5 - 2) * 0.45;
-  return { x: base.x + j, z: base.z };
+  const [ox, oz] = SPREAD[spotSlot(s.activity, s.session_id)];
+  return { x: base.x + ox, z: base.z + oz };
 }
 
 function upsert(s) {
@@ -354,6 +372,7 @@ function remove(id) {
   if (ch) scene.remove(ch.mesh);
   chars.delete(id);
   seatOf.delete(id);
+  slotOf.delete(id);
 }
 function reset() { for (const id of [...chars.keys()]) remove(id); }
 

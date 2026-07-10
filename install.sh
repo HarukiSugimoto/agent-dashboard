@@ -6,7 +6,8 @@
 set -euo pipefail
 DIR="$(cd "$(dirname "$0")" && pwd)"
 
-command -v node >/dev/null || { echo "error: node が必要です"; exit 1; }
+# node はコレクタ (server.js) を動かすマシンだけ必要。hooks 転送は curl のみで動く
+command -v node >/dev/null || echo "warn: node がありません（このマシンでコレクタを動かす場合は必要）"
 command -v python3 >/dev/null || { echo "error: python3 が必要です"; exit 1; }
 
 # --- Claude Code hooks を settings.json にマージ ---

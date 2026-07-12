@@ -389,6 +389,32 @@ function syncSatellites(ch, n) {
   while (ch.sats.length > n) ch.mesh.remove(ch.sats.pop());
 }
 
+// ---------- 吹き出しの重なり回避 ----------
+// 吹き出しは横に広い（名前＋状態）ため、床で散らしても画面上では重なる。
+// 画面X方向で重なるもの同士だけを縦に段積み（区間彩色）して読めるようにする。
+const BUBBLE_BASE_Y = 2.0;   // 頭上の基準高さ
+const BUBBLE_STEP = 1.02;    // 1段ぶんの高さ（吹き出し高さ 1.0 より少し大きく）
+const _bv = new THREE.Vector3();
+function resolveBubbleTiers() {
+  const list = [];
+  for (const ch of chars.values()) {
+    if (!ch.bubble) continue;
+    // オルソ等角なので画面Xは worldY に依存しない（y=基準高さで投影して十分）
+    _bv.set(ch.mesh.position.x, BUBBLE_BASE_Y, ch.mesh.position.z).project(camera);
+    const halfW = (ch.bubble.scale.x * 0.5) / ((camera.right - camera.left) / 2);
+    list.push({ ch, x: _bv.x, halfW });
+  }
+  list.sort((a, b) => a.x - b.x);
+  const tierRight = []; // tierRight[t] = その段に最後に置いた吹き出しの右端（画面X）
+  for (const b of list) {
+    const left = b.x - b.halfW, right = b.x + b.halfW;
+    let t = 0;
+    while (t < tierRight.length && tierRight[t] > left + 1e-4) t++; // 重なる段はスキップ
+    tierRight[t] = right;
+    b.ch.bubbleTier = t;
+  }
+}
+
 // ---------- メインループ ----------
 const clock = new THREE.Clock();
 const SPEED = 2.2;
@@ -441,6 +467,13 @@ function tick() {
         s.position.set(Math.cos(a) * R, 1.35 + Math.sin(t / 300 + i) * 0.06, Math.sin(a) * R);
       });
     }
+  }
+  // 吹き出しの段を割り当てて、その高さへふわっと寄せる（重なり回避）
+  resolveBubbleTiers();
+  for (const ch of chars.values()) {
+    if (!ch.bubble) continue;
+    const ty = BUBBLE_BASE_Y + (ch.bubbleTier || 0) * BUBBLE_STEP;
+    ch.bubble.position.y += (ty - ch.bubble.position.y) * 0.15;
   }
   renderer.render(scene, camera);
 }

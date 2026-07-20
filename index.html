@@ -7,13 +7,13 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Zen+Maru+Gothic:wght@500;700&family=IBM+Plex+Mono:wght@400;600&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap" rel="stylesheet">
-<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js"}}</script>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"}}</script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   button { font: inherit; cursor: pointer; }
 
   /* ================= テーマ変数 ================= */
-  body[data-theme="clay"], body[data-theme="office"] {
+  body[data-theme="clay"], body[data-theme="office"], body[data-theme="company"] {
     --bg: #f6efe3;
     --text: #5b4a3a;
     --dim: #a08d78;
@@ -234,6 +234,67 @@
   #officeWrap { position: fixed; inset: 0; z-index: 0; }
   #officeWrap canvas { display: block; width: 100%; height: 100%; }
 
+  /* ================= AI カンパニー（昼） ================= */
+  /* company: 夜のオフィス。ヘッダー帯もシーンに合わせて濃色に */
+  body[data-theme="company"] {
+    --bg: #0e1322; --text: #e6e9f2; --dim: #9aa3c4;
+    --card-hi: #1a2236; --card-lo: #121828;
+    --sh-dark: rgba(0, 0, 0, .5); --sh-light: rgba(255, 255, 255, .04);
+  }
+  /* ヘッダー帯（3Dキャンバスの上の細い部分）を濃色に */
+  body[data-theme="company"] header { background: #0e1322; }
+  body[data-theme="company"] #blobs { display: none; }
+  #company { display: none; }
+  body[data-theme="company"] #grid { display: none; }
+  body[data-theme="company"] #company { display: block; }
+  #companyWrap { position: fixed; inset: 0; z-index: 0; }
+  #companyWrap canvas { display: block; width: 100%; height: 100%; }
+
+  /* Company: 吹き出しは HTML オーバーレイ（ベクター文字でくっきり） */
+  #companyLabels { position: fixed; inset: 0; z-index: 4; pointer-events: none; display: none; }
+  body[data-theme="company"] #companyLabels { display: block; }
+  .clbl { position: absolute; left: 0; top: 0; will-change: transform; pointer-events: auto; cursor: pointer; }
+  .clbl-in {
+    position: relative; transform: translate(-50%, -100%);
+    background: #fff; border-radius: 13px; padding: .34rem .55rem .44rem;
+    box-shadow: 0 8px 22px rgba(0,0,0,.4); min-width: 92px; max-width: 240px;
+    font-family: "Zen Maru Gothic", sans-serif;
+  }
+  .clbl-in::after {
+    content: ''; position: absolute; left: 50%; bottom: -8px; transform: translateX(-50%);
+    border: 8px solid transparent; border-top-color: #fff;
+  }
+  .clbl.wait .clbl-in { box-shadow: 0 8px 22px rgba(0,0,0,.4), 0 0 0 2.5px #ee5d5d; }
+  .clbl-tag {
+    display: inline-block; max-width: 100%; font-weight: 700; font-size: .68rem; line-height: 1.5;
+    color: #fff; padding: .04rem .55rem; border-radius: 999px; margin-bottom: .18rem;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom;
+  }
+  .clbl-status { display: flex; align-items: center; gap: .32rem; font-weight: 700; font-size: .82rem; }
+  .clbl-dot { width: 7px; height: 7px; border-radius: 50%; flex: 0 0 auto; }
+  .clbl-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .clbl-detail { font-size: .68rem; color: #6a7286; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: .12rem; }
+  .clbl-bar { height: 6px; border-radius: 999px; background: #e6eaf2; margin-top: .32rem; overflow: hidden; }
+  .clbl-bar i { display: block; height: 100%; border-radius: 999px; transition: width .4s; }
+
+  /* Company: サイネージも HTML オーバーレイでくっきり */
+  #companySign { position: fixed; z-index: 4; pointer-events: none; display: none; }
+  body[data-theme="company"] #companySign { display: block; }
+  .sign-in {
+    width: 100%; height: 100%; box-sizing: border-box; overflow: hidden;
+    background: linear-gradient(180deg, #1b2656, #0c1226);
+    border-radius: .3em; padding: .2em .9em;
+    display: flex; flex-direction: column; justify-content: center;
+    font-family: "Baloo 2", "Zen Maru Gothic", sans-serif;
+  }
+  .sign-title { font-weight: 800; font-size: 1.55em; line-height: 1.05; white-space: nowrap; color: #4de3a8; text-shadow: 0 0 .3em rgba(77,227,168,.7); }
+  .sign-stats { display: flex; gap: 1.1em; margin-top: .5em; font-family: "Zen Maru Gothic", sans-serif; font-weight: 700; font-size: 1.0em; }
+  .sign-stats span { display: flex; align-items: center; color: #e8ecf8; white-space: nowrap; }
+  .sign-stats span::before { content: ''; width: .55em; height: .55em; border-radius: 50%; margin-right: .38em; }
+  .sign-stats .s-run::before { background: #58c98d; }
+  .sign-stats .s-wait::before { background: #ee5d5d; }
+  .sign-stats .s-seat::before { background: #9fb0d8; }
+
   /* セッション詳細パネル */
   #opanel {
     position: fixed; right: 20px; bottom: 20px; z-index: 5;
@@ -352,6 +413,21 @@
   .pk-prev-office span:nth-child(1) { width: 40px; height: 40px; background: radial-gradient(circle at 35% 30%, #fff, #ffbe78); top: 26px; left: 40px; box-shadow: 0 0 22px #ffab5c; }
   .pk-prev-office span:nth-child(2) { width: 10px; height: 10px; background: #7ef2a0; top: 20px; right: 34px; box-shadow: 0 0 12px #7ef2a0; }
   .pk-prev-office span:nth-child(3) { width: 8px; height: 8px; background: #f8a8c8; bottom: 30px; right: 54px; box-shadow: 0 0 10px #f8a8c8; }
+  /* Company プレビュー: 昼のオフィス + サイネージ + ロボット */
+  .pk-prev-company { background: linear-gradient(165deg, #f0f5fc 0%, #dde6f2 55%, #ccd7e6 100%); }
+  .pk-prev-company::before {
+    content: ""; position: absolute; top: 12px; left: 17%; width: 66%; height: 27%;
+    border-radius: 6px; background: #141c3c; box-shadow: 0 0 16px rgba(77, 227, 168, .55);
+  }
+  .pk-prev-company::after {
+    content: ""; position: absolute; left: 24%; bottom: 0; width: 52%; height: 30%;
+    background: linear-gradient(180deg, transparent, rgba(95, 155, 214, .25));
+  }
+  .pk-prev-company span { position: absolute; border-radius: 50%; }
+  .pk-prev-company span:nth-child(1) { width: 18px; height: 18px; background: #58c98d; bottom: 26px; left: 34px; box-shadow: 0 3px 6px rgba(90,110,140,.4); }
+  .pk-prev-company span:nth-child(2) { width: 15px; height: 15px; background: #8f7ae8; bottom: 40px; right: 44px; box-shadow: 0 3px 6px rgba(90,110,140,.4); }
+  .pk-prev-company span:nth-child(3) { width: 13px; height: 13px; background: #f0a05e; bottom: 18px; right: 84px; box-shadow: 0 3px 6px rgba(90,110,140,.4); }
+  .pick:nth-child(3) { animation-delay: .14s; }
   /* Console プレビュー: 高密度リストの行 */
   .pk-prev-ops { background: linear-gradient(160deg, #0c1014, #070a0d); padding: 12px; display: flex; flex-direction: column; gap: 7px; }
   .pk-prev-ops i { display: block; height: 12px; border-radius: 3px; border-left: 3px solid var(--pc, #3dd68c); background: rgba(255,255,255,.05); }
@@ -389,6 +465,15 @@
   <div id="officeWrap"></div>
 </section>
 
+<section id="company">
+  <div id="companyWrap"></div>
+</section>
+<div id="companyLabels"></div>
+<div id="companySign"><div class="sign-in">
+  <div class="sign-title">AGENT OPS Inc.</div>
+  <div class="sign-stats"></div>
+</div></div>
+
 <div id="opanel" hidden>
   <div class="op-head"><b id="op-proj"></b><button id="op-close">✕</button></div>
   <div id="op-status"></div>
@@ -417,7 +502,12 @@
       <button class="pick" data-t="office">
         <div class="pk-prev pk-prev-office"><span></span><span></span><span></span></div>
         <div class="pk-name">Office</div>
-        <div class="pk-desc">3Dの部屋でキャラクターが働く</div>
+        <div class="pk-desc">夜のロフトでキャラクターが働く</div>
+      </button>
+      <button class="pick" data-t="company">
+        <div class="pk-prev pk-prev-company"><span></span><span></span><span></span></div>
+        <div class="pk-name">Company</div>
+        <div class="pk-desc">昼のAIカンパニーでロボット社員が働く</div>
       </button>
       <button class="pick" data-t="ops">
         <div class="pk-prev pk-prev-ops"><i></i><i></i><i></i><i></i></div>
@@ -429,6 +519,7 @@
 </div>
 
 <script type="module" src="/assets/office.js"></script>
+<script type="module" src="/assets/company.js"></script>
 <script>
 const COLORS = ['coding','reading','searching','running','delegating','planning','thinking','waiting','idle','ended'];
 const EMOJI = {
@@ -495,6 +586,7 @@ function removeSession(id) {
   sessions.delete(id);
   document.getElementById('s-' + id)?.remove();
   window.Office?.remove(id);
+  window.Company?.remove(id);
   if (panelForId === id) hideSessionPanel();
   empty.style.display = sessions.size ? 'none' : '';
 }
@@ -515,10 +607,12 @@ function apply(s) {
   sessions.set(s.session_id, s);
   renderSession(s);
   window.Office?.upsert(s);
+  window.Company?.upsert(s);
   if (panelForId === s.session_id) showSessionPanel(s.session_id); // パネル表示中なら追従更新
 }
-// office.js (module) の読込完了が SSE より遅れた場合の同期
+// 3D モジュールの読込完了が SSE より遅れた場合の同期
 window.addEventListener('office-ready', () => sessions.forEach((s) => window.Office.upsert(s)));
+window.addEventListener('company-ready', () => sessions.forEach((s) => window.Company.upsert(s)));
 // 3秒待っても 3D エンジンが来なければヒント欄に知らせる
 setTimeout(() => {
   if (!window.Office) {
@@ -531,6 +625,7 @@ function resetUI() {
   sessions.clear();
   grid.querySelectorAll('.card').forEach((el) => el.remove());
   window.Office?.reset();
+  window.Company?.reset();
   hideSessionPanel();
   empty.style.display = '';
 }
@@ -645,8 +740,10 @@ picks.forEach((b) => (b.onclick = () => setTheme(b.dataset.t)));
 document.getElementById('themeBtn').onclick = openPicker;
 // パネル外クリックで閉じる
 picker.addEventListener('click', (e) => { if (e.target === picker) picker.hidden = true; });
+const THEMES = ['ops', 'company', 'office'];
+const urlTheme = new URLSearchParams(location.search).get('view'); // ?view=company で直接指定可
 const saved = localStorage.getItem('agentops-theme');
-setTheme(saved === 'ops' ? 'ops' : 'office'); // 既定は Office
+setTheme(THEMES.includes(urlTheme) ? urlTheme : THEMES.includes(saved) ? saved : 'office'); // 既定は Office
 
 // --- SSE ---
 const conn = document.getElementById('conn');

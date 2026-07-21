@@ -253,9 +253,10 @@
   /* Company: 吹き出しは HTML オーバーレイ（ベクター文字でくっきり） */
   #companyLabels { position: fixed; inset: 0; z-index: 4; pointer-events: none; display: none; }
   body[data-theme="company"] #companyLabels { display: block; }
-  .clbl { position: absolute; left: 0; top: 0; will-change: transform; pointer-events: auto; cursor: pointer; }
+  .clbl { position: absolute; left: 0; top: 0; will-change: transform; pointer-events: none; }
   .clbl-in {
     position: relative; transform: translate(-50%, -100%);
+    pointer-events: auto; cursor: pointer;
     background: #fff; border-radius: 13px; padding: .34rem .55rem .44rem;
     box-shadow: 0 8px 22px rgba(0,0,0,.4); min-width: 92px; max-width: 240px;
     font-family: "Zen Maru Gothic", sans-serif;

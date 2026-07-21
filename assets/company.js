@@ -404,7 +404,7 @@ function updateLabel(ch) {
     el.className = 'clbl';
     el.innerHTML = '<div class="clbl-in"><span class="clbl-tag"></span>' +
       '<div class="clbl-status"><span class="clbl-dot"></span><span class="clbl-label"></span></div>' +
-      '<div class="clbl-detail"></div><div class="clbl-bar"><i></i></div></div>';
+      '<div class="clbl-bar"><i></i></div></div>';
     labelLayer.appendChild(el);
     ch.labelEl = el;
     // 吹き出しクリック → 前面に出す＋詳細パネルを開く
@@ -415,13 +415,13 @@ function updateLabel(ch) {
     });
     ch._els = {
       tag: el.querySelector('.clbl-tag'), dot: el.querySelector('.clbl-dot'),
-      label: el.querySelector('.clbl-label'), detail: el.querySelector('.clbl-detail'),
+      label: el.querySelector('.clbl-label'),
       bar: el.querySelector('.clbl-bar'), fill: el.querySelector('.clbl-bar i'),
     };
   }
   const tok = ch.tokens;
   const pct = tok && tok.ctx > 0 ? Math.min(100, Math.round((tok.ctx / tok.ctxMax) * 100)) : null;
-  const key = `${ch.project}|${ch.label}|${ch.detail}|${ch.activity}|${pct}`;
+  const key = `${ch.project}|${ch.label}|${ch.activity}|${pct}`;
   if (ch.labelKey === key) return;
   ch.labelKey = key;
   const ink = ACT_INK[ch.activity] || '#5c6e94';
@@ -429,7 +429,6 @@ function updateLabel(ch) {
   e.tag.textContent = ch.project || ''; e.tag.style.background = ch.color;
   e.dot.style.background = ink;
   e.label.textContent = ch.label || ''; e.label.style.color = ink;
-  e.detail.textContent = ch.detail || ''; e.detail.style.display = ch.detail ? '' : 'none';
   if (pct != null) { e.bar.style.display = ''; e.fill.style.width = pct + '%'; e.fill.style.background = pct < 70 ? '#58c98d' : pct < 90 ? '#e5c04e' : '#ee5d5d'; }
   else e.bar.style.display = 'none';
   el.classList.toggle('wait', ch.activity === 'waiting');

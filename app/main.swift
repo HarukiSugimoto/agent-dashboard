@@ -57,8 +57,13 @@ let PET_URL = URL(string: "http://127.0.0.1:4820/pet")!
 // ignoresMouseEvents = true にして背後のアプリへクリックを通す。
 // ============================================================================
 
-final class PetWindow: NSWindow {
+// 通常の NSWindow ではなく NSPanel（.nonactivatingPanel）にしている。
+// NSWindow + .floating だと、全 Space 指定 (.canJoinAllSpaces) を付けても
+// Space を切り替えた瞬間に OS 側で隠されてしまう（他アプリのフルスクリーン Space では特に）。
+// 非アクティブ化しないパネルにすると、アプリがアクティブでない Space でも出したままにできる。
+final class PetWindow: NSPanel {
     override var canBecomeKey: Bool { true }   // 枠なしウィンドウは既定でキーになれない
+    override var canBecomeMain: Bool { false } // つかんでもアプリをアクティブにしない
 }
 
 // ペットの挙動を追うためのログ。~/Library/Logs/AgentOps-pet.log に追記する
@@ -94,8 +99,43 @@ final class PetController: NSObject, WKScriptMessageHandler {
     // 別画面へカーソルが移ってから追いかけ始めるまでの待ち。0 にすると境界を跨いだ瞬間に動く。
     static let followDelay: TimeInterval = UserDefaults.standard.object(forKey: "PetFollowDelay") as? Double ?? 0.1
 
-    private var height: CGFloat = 600
-    private var size: NSSize { NSSize(width: (height * PetController.aspect).rounded(), height: height) }
+    // 吹き出しをこの数だけ積める高さを、ロボットの上に確保する（pet.js の MAX_BUBBLES と揃える）。
+    static let bubbleSlots: CGFloat = 8
+    // 実測値: 吹き出し1つ = 4.95〜5.9rem（詳細テキストが1行か2行かで変わる）、間隔 .43rem、
+    // 上下の余白で計 1.45rem。多めに取っても透明なので見た目に出ない（画面の高さで頭打ちになる）。
+    static let bubbleRoomRem: CGFloat = bubbleSlots * 6.0 + (bubbleSlots - 1) * 0.43 + 2.0
+
+    private var height: CGFloat = 600          // 見かけの大きさ（＝ロボットの大きさ）。プリセットの値
+
+    // 窓の幅。ロボットの大きさはこれで決まる（ページ側も 3.9vw / 48.33vw で幅に追従する）。
+    private var width: CGFloat { (height * PetController.aspect).rounded() }
+
+    // ページの 1rem。pet.html の clamp(11px, 3.9vw, 22px) をそのまま写したもの。
+    private var rem: CGFloat { min(max(11, width * 0.039), 22) }
+
+    // #stage（ロボット）の高さ。pet.html の 48.33vw / min-height:100px と同じ計算。
+    private var stageHeight: CGFloat { max(width * 0.4833, 100) }
+
+    // ロボットの立ち位置は変えずに、吹き出し8つ分を上に積める高さを足した「窓の」大きさ。
+    // 窓は透明なので縦に長くても見た目には出ない。ただし画面の外へ出た分の吹き出しは
+    // 見えないのに JS が「入る」と判断してしまうので、画面に収まる高さで打ち止めにする。
+    private var size: NSSize {
+        let want = (stageHeight + PetController.bubbleRoomRem * rem).rounded()
+        return NSSize(width: width, height: min(want, maxWindowHeight()))
+    }
+
+    // いま置いている場所から画面の上端までの余地。足元より下は使わないので上向きだけ見る。
+    private func maxWindowHeight() -> CGFloat {
+        guard let f = window?.frame else {
+            return (NSScreen.main?.visibleFrame.height ?? 900) - 24
+        }
+        // 足元のある画面で測る。y 範囲は横並びの画面同士で重なるので、点で引く。
+        let foot = NSPoint(x: f.midX, y: f.minY + 1)
+        let screen = NSScreen.screens.first { $0.frame.contains(foot) } ?? window?.screen ?? NSScreen.main
+        guard let vf = screen?.visibleFrame else { return 900 }
+        // ロボットだけは必ず収まるようにしておく（画面下端に置かれた場合の保険）
+        return max(vf.maxY - max(f.minY, vf.minY) - 8, stageHeight + 2 * rem)
+    }
 
     private var window: PetWindow!
     private var web: PetWebView!
@@ -129,11 +169,15 @@ final class PetController: NSObject, WKScriptMessageHandler {
 
     private func build() {
         let frame = NSRect(origin: .zero, size: size)
-        window = PetWindow(contentRect: frame, styleMask: [.borderless], backing: .buffered, defer: false)
+        window = PetWindow(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel],
+                           backing: .buffered, defer: false)
         window.isOpaque = false
         window.backgroundColor = .clear
         window.hasShadow = false                       // 影は Web 側（吹き出し/足元）で描く
         window.isReleasedWhenClosed = false
+        window.isFloatingPanel = true
+        // NSPanel の既定は true。そのままだと他アプリに切り替えた瞬間にロボットが消える。
+        window.hidesOnDeactivate = false
         applyWindowBehavior()
 
         // Space を切り替えたときに取り残されることがあるので、都度出し直す
@@ -151,16 +195,43 @@ final class PetController: NSObject, WKScriptMessageHandler {
         window.contentView = web
 
         window.setFrameOrigin(savedOrigin() ?? defaultOrigin())
+        refitHeight()
+
+        // ディスプレイの増減や解像度変更で「上に取れる余地」が変わる
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(screensChanged),
+            name: NSApplication.didChangeScreenParametersNotification, object: nil)
     }
+
+    @objc private func screensChanged() { refitHeight() }
+
+    // 置き場所が変わると上に取れる余地も変わるので、窓の高さを測り直す（足元は動かさない）。
+    // size は現在の frame.minY を見て決まるので、minY を保つ限り往復しない。
+    private func refitHeight() {
+        guard let window = window else { return }
+        let f = window.frame, s = size
+        guard abs(f.height - s.height) > 1 || abs(f.width - s.width) > 1 else { return }
+        window.setFrame(NSRect(x: f.minX, y: f.minY, width: s.width, height: s.height), display: true)
+        applyWindowBehavior()
+    }
+
+    // ウィンドウレベル。.floating(3) だと Space を切り替えたときに隠されてしまうので、
+    // 既定は .screenSaver(1000)。他アプリのフルスクリーン Space にも重なるのはこの高さのため。
+    // 高すぎて邪魔なら下げられる: defaults write dev.harusugi.agent-ops PetWindowLevel 25
+    static let windowLevel: NSWindow.Level = {
+        if let v = UserDefaults.standard.object(forKey: "PetWindowLevel") as? Int {
+            return NSWindow.Level(rawValue: v)
+        }
+        return .screenSaver
+    }()
 
     // 「常に最前面」「全 Space に表示」の指定。ウィンドウレベルやフレームを触ると
     // 取り消されることがあるので、状態を変えるたびに呼び直す。
-    // .stationary は Mission Control で動かさないため、.fullScreenAuxiliary は
-    // 他アプリのフルスクリーン上にも重ねるため。
+    // .stationary は Mission Control で動かさないため、.ignoresCycle は ⌘` の巡回に混ざらないため。
     private func applyWindowBehavior() {
         guard let window = window else { return }
-        window.level = .floating
-        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
+        window.level = PetController.windowLevel
+        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
     }
 
     // ---- カーソルのある画面へ追従 ----
@@ -186,9 +257,12 @@ final class PetController: NSObject, WKScriptMessageHandler {
         let f = window.frame
         let from = from ?? screen.visibleFrame
         let vf = screen.visibleFrame
-        let x = min(max((vf.maxX - (from.maxX - f.maxX) - f.width).rounded(), vf.minX), vf.maxX - f.width)
-        let y = min(max((vf.minY + (f.minY - from.minY)).rounded(), vf.minY), vf.maxY - f.height)
+        // 画面に収まらない縦長の窓でも足元は画面内に残す（はみ出た分は refitHeight が詰める）ので、
+        // 下端側のクリップを後に置く
+        let x = max(min((vf.maxX - (from.maxX - f.maxX) - f.width).rounded(), vf.maxX - f.width), vf.minX)
+        let y = max(min((vf.minY + (f.minY - from.minY)).rounded(), vf.maxY - f.height), vf.minY)
         window.setFrameOrigin(NSPoint(x: x, y: y))
+        refitHeight()
         applyWindowBehavior()
         saveOrigin()
         petLog("画面追従: \(screen.localizedName) へ → \(NSStringFromRect(window.frame))")
@@ -196,9 +270,20 @@ final class PetController: NSObject, WKScriptMessageHandler {
 
     @objc private func activeSpaceChanged() {
         guard let window = window, window.isVisible else { return }
+        reassert("space変更")
+        // 切り替えアニメーションの最中に出し直しても反映されないことがあるので、一拍おいてもう一度。
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
+            guard let self = self, let w = self.window, w.isVisible else { return }
+            self.reassert("space変更(再)")
+        }
+    }
+
+    // 最前面・全 Space の指定を貼り直して出し直す。取り残されたときの復帰手段。
+    private func reassert(_ tag: String) {
+        guard let window = window else { return }
         applyWindowBehavior()
-        if !window.isOnActiveSpace { window.orderFrontRegardless() }
-        petLog("space変更: onActiveSpace=\(window.isOnActiveSpace) visible=\(window.isVisible) "
+        window.orderFrontRegardless()
+        petLog("\(tag): onActiveSpace=\(window.isOnActiveSpace) visible=\(window.isVisible) "
              + "behavior=\(window.collectionBehavior.rawValue) level=\(window.level.rawValue) "
              + "frame=\(NSStringFromRect(window.frame))")
     }
@@ -222,6 +307,7 @@ final class PetController: NSObject, WKScriptMessageHandler {
     func show() {
         if window == nil { build() }
         if web.url == nil { web.load(URLRequest(url: PET_URL)) }
+        refitHeight()
         applyWindowBehavior()
         window.orderFrontRegardless()
         petLog("show: behavior=\(window.collectionBehavior.rawValue) level=\(window.level.rawValue) "
@@ -240,6 +326,7 @@ final class PetController: NSObject, WKScriptMessageHandler {
     func resetPosition() {
         guard window != nil else { return }
         window.setFrameOrigin(defaultOrigin())
+        refitHeight()
         saveOrigin()
     }
 
@@ -335,6 +422,7 @@ final class PetController: NSObject, WKScriptMessageHandler {
         dragMonitors.removeAll()
         if dragHeight > 0 { UserDefaults.standard.set(Double(height), forKey: "AgentOpsPetHeight") }
         dragHeight = 0
+        refitHeight()      // 置き直した先で上に取れる余地が変わっている
         saveOrigin()
     }
 }

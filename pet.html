@@ -116,7 +116,10 @@
   #more[hidden] { display: none; }
 
   /* ---------- ロボット ---------- */
-  #stage { width: 100%; height: 29vh; min-height: 100px; flex: 0 0 auto; position: relative; }
+  /* ロボットの大きさは「窓の幅」で決める（高さ基準にしない）。
+     窓は吹き出し8つ分の余白を上に積んで縦長になるので、vh 基準だとロボットも一緒に伸びてしまう。
+     48.33vw = 従来の 29vh（窓の縦横比 3:5 のときに等しい）。 */
+  #stage { width: 100%; height: 48.33vw; min-height: 100px; flex: 0 0 auto; position: relative; }
   #stage canvas { display: block; width: 100%; height: 100%; }
   /* ロボットを掴んでウィンドウを動かせることを示す */
   #stage { pointer-events: auto; cursor: grab; }

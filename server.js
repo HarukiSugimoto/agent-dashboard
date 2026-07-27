@@ -333,9 +333,11 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  if (url.pathname === '/') {
-    fs.readFile(path.join(__dirname, 'index.html'), (err, data) => {
-      if (err) return res.writeHead(500).end('index.html not found');
+  // '/' = ダッシュボード本体 / '/pet' = デスクトップ常駐ペット（透明背景・ロボットだけ）
+  if (url.pathname === '/' || url.pathname === '/pet') {
+    const file = url.pathname === '/pet' ? 'pet.html' : 'index.html';
+    fs.readFile(path.join(__dirname, file), (err, data) => {
+      if (err) return res.writeHead(500).end(file + ' not found');
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }).end(data);
     });
     return;

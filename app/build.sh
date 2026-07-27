@@ -11,6 +11,12 @@ swiftc -O main.swift -o "$APP/Contents/MacOS/AgentOps" \
 
 cp Info.plist "$APP/Contents/Info.plist"
 
+# メニューバー用アイコン（透過PNG）。テンプレート画像として使うのでアルファだけが意味を持つ。
+if [ -f menu-icon.png ]; then
+  cp menu-icon.png "$APP/Contents/Resources/menu-icon.png"
+  echo "menu icon: menu-icon.png embedded"
+fi
+
 # icon.png (1024x1024) があれば .icns に変換して組み込む
 if [ -f icon.png ]; then
   ICONSET=$(mktemp -d)/AppIcon.iconset

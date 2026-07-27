@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AGENT OPS — Pet</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"}}</script>
+<style>
+  /* デスクトップ常駐ペット。背景は完全に透明 —— ロボットと吹き出しだけが浮く。
+     AgentOps.app の透明ウィンドウ内で表示される想定（ブラウザでも動作確認できる）。 */
+  * { box-sizing: border-box; }
+  html {
+    /* 窓の大きさに追従させるための基準。以下のサイズはすべて rem か vh で書く。
+       ウィンドウは 3:5（幅=高さ×0.6）で拡縮されるので、幅を基準にすれば全体が相似に変わる。 */
+    font-size: clamp(11px, 3.9vw, 22px);
+  }
+  html, body {
+    margin: 0; height: 100%; background: transparent; overflow: hidden;
+    font-family: "Noto Sans JP", system-ui, sans-serif;
+    -webkit-user-select: none; user-select: none;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* ブラウザで直接開いたとき用の市松模様（?checker で有効。透明領域の確認に使う） */
+  body.checker { background:
+    repeating-conic-gradient(#2a2f38 0% 25%, #222730 0% 50%) 50% / 22px 22px; }
+
+  /* ペットは「見るだけ」。掴めるのはロボット本体だけなので、
+     どの要素もマウスを受けない（Swift 側もロボットの矩形しか当たり判定に入れない）。 */
+  #pet {
+    position: fixed; inset: 0; pointer-events: none;
+    display: flex; flex-direction: column; justify-content: flex-end; align-items: center;
+    padding: .7rem .7rem 0;
+  }
+
+  /* ---------- 吹き出し ---------- */
+  #bubbles {
+    width: 100%;
+    flex: 1 1 auto; min-height: 0;   /* 高さを空きいっぱいに固定 → 入るかどうかを JS が判定できる */
+    display: flex; flex-direction: column; justify-content: flex-end; align-items: stretch;
+    gap: .43rem; overflow: hidden;
+    padding-bottom: .75rem;          /* 一番下の吹き出しのしっぽが切れない分だけ空ける */
+  }
+  .pbl {
+    flex: 0 0 auto;                 /* 数が増えても潰さない（入らない分は JS が引っ込める） */
+    position: relative;             /* ✕ ボタンの基準 */
+    background: #f7f9fc; color: #1a1f2b;
+    border-radius: .85rem; padding: .42rem .6rem .48rem;
+    box-shadow: 0 .7rem 1.9rem rgba(0, 0, 0, .45), 0 1px 0 rgba(255, 255, 255, .5) inset;
+    border-left: .28rem solid var(--c, #8a97b8);
+    transform-origin: bottom center;
+  }
+  /* 登場アニメは追加直後だけ。並び替えで DOM を動かしても再生されないようクラスで制御する */
+  .pbl.new { animation: pop .22s cubic-bezier(.2, 1.4, .5, 1); }
+  @keyframes pop { from { opacity: 0; transform: translateY(6px) scale(.94); } }
+
+  /* 一番下の吹き出しだけロボットへ向かうしっぽを出す */
+  .pbl:last-child { position: relative; }
+  .pbl:last-child::after {
+    content: ''; position: absolute; left: 50%; bottom: -.5rem; width: 1rem; height: 1rem;
+    background: #f7f9fc; transform: translateX(-50%) rotate(45deg); border-radius: .14rem;
+  }
+
+  .pbl-top { display: flex; align-items: baseline; gap: .4rem; }
+  .pbl-proj {
+    font-size: .62rem; font-weight: 700; letter-spacing: .02em;
+    color: #fff; background: var(--c, #8a97b8);
+    padding: .06rem .38rem; border-radius: 999px;
+    max-width: 13em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .pbl-ago {
+    margin-left: auto; font-family: "IBM Plex Mono", monospace; font-size: .58rem; color: #97a0b3;
+    transition: opacity .12s;
+  }
+  /* ホバー中だけ右上に出る ✕（経過時間と入れ替わる）。押すとそのセッションを消す。
+     ここだけ pointer-events を戻す ＝ 吹き出しの他の場所は背後のアプリへ素通りのまま。 */
+  .pbl-x {
+    position: absolute; top: .3rem; right: .38rem;
+    width: 1.25rem; height: 1.25rem; padding: 0; border: 0; border-radius: 50%;
+    background: #e6eaf2; color: #5a6478; font-size: .62rem; line-height: 1;
+    display: grid; place-items: center; cursor: pointer;
+    opacity: 0; transform: scale(.8); pointer-events: none;
+    transition: opacity .12s, transform .12s, background .12s;
+  }
+  .pbl.hot .pbl-x { opacity: 1; transform: scale(1); pointer-events: auto; }
+  .pbl.hot .pbl-ago { opacity: 0; }
+  .pbl-x:hover { background: #ee5d5d; color: #fff; }
+  .pbl-x:active { transform: scale(.92); }
+  .pbl-status { display: flex; align-items: center; gap: .34rem; margin-top: .22rem; }
+  .pbl-dot { width: .5rem; height: .5rem; border-radius: 50%; flex: 0 0 auto; background: var(--ink, #5c6e94); }
+  .pbl-label { font-weight: 700; font-size: .8rem; color: var(--ink, #5c6e94); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pbl-detail {
+    font-size: .68rem; color: #5a6478; margin-top: .1rem; line-height: 1.35;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .pbl-bar { height: .36rem; border-radius: 999px; background: #e3e8f0; margin-top: .32rem; overflow: hidden; }
+  .pbl-bar i { display: block; height: 100%; border-radius: 999px; transition: width .4s; }
+
+  /* 承認待ち: 赤枠が脈打つ */
+  .pbl.wait { box-shadow: 0 .7rem 1.9rem rgba(0, 0, 0, .45), 0 0 0 .18rem #ee5d5d; animation: wpulse 1.5s ease-in-out infinite; }
+  .pbl.wait.new { animation: pop .22s cubic-bezier(.2,1.4,.5,1), wpulse 1.5s ease-in-out infinite .22s; }
+  @keyframes wpulse {
+    0%, 100% { box-shadow: 0 .7rem 1.9rem rgba(0,0,0,.45), 0 0 0 .18rem #ee5d5d; }
+    50%      { box-shadow: 0 .7rem 1.9rem rgba(0,0,0,.45), 0 0 0 .36rem rgba(238,93,93,.35); }
+  }
+
+  /* 表示しきれない分（吹き出しの列の一番上に居座る） */
+  #more {
+    flex: 0 0 auto; align-self: center; order: -1; margin-bottom: .15rem;
+    font-size: .6rem; font-weight: 700; color: #dfe6f2;
+    background: rgba(18, 22, 30, .82); padding: .16rem .5rem; border-radius: 999px;
+    box-shadow: 0 .28rem 1rem rgba(0, 0, 0, .45);
+  }
+  #more[hidden] { display: none; }
+
+  /* ---------- ロボット ---------- */
+  #stage { width: 100%; height: 29vh; min-height: 100px; flex: 0 0 auto; position: relative; }
+  #stage canvas { display: block; width: 100%; height: 100%; }
+  /* ロボットを掴んでウィンドウを動かせることを示す */
+  #stage { pointer-events: auto; cursor: grab; }
+  #stage.dragging { cursor: grabbing; }
+
+  /* セッションゼロのときの小さな寝息 */
+  #zzz {
+    position: absolute; left: 50%; top: 1.8rem; transform: translateX(-50%);
+    font-size: .8rem; color: #cfd8e8; text-shadow: 0 2px 8px rgba(0, 0, 0, .7);
+    opacity: 0; transition: opacity .5s; letter-spacing: .1em; pointer-events: none;
+  }
+  #zzz.on { opacity: .85; animation: zfloat 3s ease-in-out infinite; }
+  @keyframes zfloat { 0%,100% { transform: translateX(-50%) translateY(0); } 50% { transform: translateX(-50%) translateY(-.45rem); } }
+
+  /* 接続が切れているとき */
+  #off {
+    position: absolute; left: 50%; bottom: 6px; transform: translateX(-50%);
+    font-size: .58rem; color: #ffb4b4; background: rgba(40, 12, 12, .85);
+    padding: .12rem .45rem; border-radius: 999px; white-space: nowrap;
+  }
+  #off[hidden] { display: none; }
+</style>
+</head>
+<body>
+<div id="pet">
+  <div id="bubbles"><div id="more" hidden></div></div>
+  <div id="stage">
+    <div id="zzz">z z z</div>
+    <div id="off" hidden>コレクタ未接続</div>
+  </div>
+</div>
+<script type="module" src="/assets/pet.js"></script>
+</body>
+</html>

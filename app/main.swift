@@ -101,9 +101,10 @@ final class PetController: NSObject, WKScriptMessageHandler {
 
     // 吹き出しをこの数だけ積める高さを、ロボットの上に確保する（pet.js の MAX_BUBBLES と揃える）。
     static let bubbleSlots: CGFloat = 8
-    // 実測値: 吹き出し1つ = 4.95〜5.9rem（詳細テキストが1行か2行かで変わる）、間隔 .43rem、
-    // 上下の余白で計 1.45rem。多めに取っても透明なので見た目に出ない（画面の高さで頭打ちになる）。
-    static let bubbleRoomRem: CGFloat = bubbleSlots * 6.0 + (bubbleSlots - 1) * 0.43 + 2.0
+    // 実測値: 吹き出し1つ = 5.35〜6.3rem（詳細テキストが1行か2行か＋プロジェクト名のピルの高さ）、
+    // 間隔 .43rem、上下の余白で計 1.45rem。
+    // 多めに取っても透明なので見た目に出ない（画面の高さで頭打ちになる）。
+    static let bubbleRoomRem: CGFloat = bubbleSlots * 6.4 + (bubbleSlots - 1) * 0.43 + 2.0
 
     private var height: CGFloat = 600          // 見かけの大きさ（＝ロボットの大きさ）。プリセットの値
 

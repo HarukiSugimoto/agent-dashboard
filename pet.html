@@ -64,14 +64,17 @@
   }
 
   .pbl-top { display: flex; align-items: baseline; gap: .4rem; }
+  /* どのディレクトリで動いているかが一番知りたい情報なので、状態ラベル(.8rem)より大きく取る。
+     小さい窓では 1rem=11px まで縮むので、ここを小さくすると実寸 7px 程度で読めなくなる。 */
   .pbl-proj {
-    font-size: .62rem; font-weight: 700; letter-spacing: .02em;
+    font-size: .95rem; font-weight: 700; letter-spacing: .01em;
     color: #fff; background: var(--c, #8a97b8);
-    padding: .06rem .38rem; border-radius: 999px;
-    max-width: 13em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    padding: .1rem .46rem; border-radius: 999px;
+    max-width: 11em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
   .pbl-ago {
     margin-left: auto; font-family: "IBM Plex Mono", monospace; font-size: .58rem; color: #97a0b3;
+    flex: 0 0 auto; white-space: nowrap;   /* 名前が長くても折り返さず、ピル側を省略させる */
     transition: opacity .12s;
   }
   /* ホバー中だけ右上に出る ✕（経過時間と入れ替わる）。押すとそのセッションを消す。

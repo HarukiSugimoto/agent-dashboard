@@ -112,11 +112,14 @@ const lastSig = new Map(); // 変化していないスレッドは再送しな�
 async function poll() {
   const nowSec = Math.floor(Date.now() / 1000);
   const rows = await sql(
-    `SELECT id, cwd, title, first_user_message, tokens_used, updated_at, rollout_path
+    `SELECT id, source, cwd, title, first_user_message, tokens_used, updated_at, rollout_path
      FROM threads WHERE archived=0 ORDER BY updated_at DESC LIMIT 40;`
   );
   for (const t of rows) {
     if (nowSec - t.updated_at > ACTIVE_WINDOW) continue; // 古すぎるものは無視
+    // 権限審査やレビューなど Codex 内部のサブエージェントは表示しない。
+    // source は通常セッションで cli / exec、内部セッションで {"subagent":...} になる。
+    if (String(t.source || '').startsWith('{"subagent"')) continue;
     let rolloutSize = 0;
     try { rolloutSize = fs.statSync(t.rollout_path).size; } catch {}
     const sig = `${t.updated_at}:${rolloutSize}`;
@@ -131,7 +134,7 @@ async function poll() {
       host: HOST,
       activity: act.activity,
       label: act.label,
-      detail: act.detail || t.title || t.first_user_message || '',
+      detail: act.detail || '',
       tokens: t.tokens_used > 0 ? { ctx: 0, out: t.tokens_used, ctxMax: 1000000 } : null,
     });
   }

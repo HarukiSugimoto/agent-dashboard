@@ -499,8 +499,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, NSMenu
     // server.js と Codex アダプタを起動する。
     // アプリ終了時にも意図的に殺さない（アプリを閉じてもイベント収集は継続させる）。
     func launchCollector() {
-        let candidates = ["/usr/local/bin/node", "/opt/homebrew/bin/node", "/usr/bin/node"]
-        guard let node = candidates.first(where: { FileManager.default.fileExists(atPath: $0) }) else { return }
+        guard let node = findNode() else { return }
 
         // .app はプロジェクトルート直下に置かれる想定: <project>/AgentOps.app
         var projectDir = (Bundle.main.bundlePath as NSString).deletingLastPathComponent
@@ -518,6 +517,29 @@ class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, NSMenu
             p.standardError = FileHandle.nullDevice
             try? p.run()
         }
+    }
+
+    // GUI アプリはシェルの PATH を引き継がないので、mise / volta / nvm 等で入れた node が
+    // 見えない。固定パス → バージョンマネージャの shim → ログインシェルの順で探す。
+    func findNode() -> String? {
+        let home = NSHomeDirectory()
+        let candidates = [
+            "/opt/homebrew/bin/node", "/usr/local/bin/node", "/usr/bin/node",
+            home + "/.local/share/mise/shims/node", home + "/.volta/bin/node",
+        ]
+        if let hit = candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0) }) { return hit }
+
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh")
+        p.arguments = ["-ilc", "command -v node"]
+        let out = Pipe()
+        p.standardOutput = out
+        p.standardError = FileHandle.nullDevice
+        guard (try? p.run()) != nil else { return nil }
+        p.waitUntilExit()
+        let path = String(decoding: out.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+            .split(separator: "\n").last.map { $0.trimmingCharacters(in: .whitespaces) } ?? ""
+        return FileManager.default.isExecutableFile(atPath: path) ? path : nil
     }
 
     // デスクトップのロボットが出ている間は、ダッシュボードを閉じても終了しない
